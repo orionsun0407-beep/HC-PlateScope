@@ -287,12 +287,9 @@
       setStatus("加载 Pyodide...");
       pyodide = await loadPyodide();
       setStatus("加载 Python 包...");
-      await pyodide.loadPackage(["numpy", "pandas", "matplotlib", "scipy", "openpyxl", "pyyaml", "micropip"]);
-      try {
-        await pyodide.runPythonAsync("import micropip\nawait micropip.install('xlrd')");
-      } catch (err) {
-        console.warn("xlrd install failed", err);
-      }
+      await pyodide.loadPackage(["numpy", "pandas", "matplotlib", "scipy", "pyyaml", "micropip"]);
+      setStatus("加载 Excel 支持...");
+      await pyodide.runPythonAsync("import micropip\nawait micropip.install(['openpyxl', 'xlrd'])");
       setStatus("写入 HC PlateScope 模块...");
       pyodide.FS.mkdirTree(`${BASE}/plate_processor`);
       pyodide.FS.mkdirTree(`${BASE}/browser_inputs`);
