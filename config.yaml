@@ -1,0 +1,115 @@
+project:
+  name: "HC PlateScope"
+  version: "1.0.0"
+
+input:
+  wavelength_keywords: ["wavelength", "wave", "lambda", "nm", "wl", "波长"]
+  well_regex: "^[A-Pa-p](0?[1-9]|1[0-9]|2[0-4])$"
+  scan_all_columns_for_wells: true
+  coerce_numeric: true
+
+plate:
+  format: "auto"
+
+smoothing:
+  method: "savgol"
+  window_length: 9
+  polyorder: 3
+
+peaks:
+  luci_450_window: [430, 470]
+  luci_520_window: [500, 540]
+
+normalization:
+  enabled: true
+  mode: "max_per_well"
+
+plotting:
+  marker_size: 1.0
+  line_width: 1.0
+  alpha: 0.55
+  line_alpha: 0.95
+  dpi: 300
+  font_family: "Arial"
+  colors:
+    primary: "#0F4D92"
+    secondary: "#8BCF8B"
+    accent: "#B64342"
+    heatmap: "hc_nature"
+  badges:
+    lss_emission: "#B64342"
+    lss_excitation: "#0F4D92"
+    lss_distance: "#E28E2C"
+    geco_ratio: "#42949E"
+    luci_ratio: "#9A4D8E"
+  y_axis:
+    per_well: true
+    upper_padding: 1.10
+    rounding_mode: "nice_round"
+  x_axis:
+    tick_interval_nm: 10
+    label_interval_nm: 50
+    show_labels_on_bottom_row_only: true
+    tick_label_rotation: 90
+  heatmap:
+    enabled: true
+    show_values: true
+    value_format: ".2f"
+    robust_scaling: true
+    robust_lower_percentile: 5
+    robust_upper_percentile: 95
+  layout:
+    rows: 8
+    cols: 12
+    page_size: "A4_portrait"
+  spectra_grid:
+    mode: "compact"
+    columns: 12
+    rows_per_page: 8
+
+output:
+  base_dir: "outputs"
+  run_index: "outputs/run_index.csv"
+
+ui:
+  show_recent_runs: true
+  recent_runs: 5
+  debug_mode: false
+
+lss:
+  normalize: false
+  use_raw_data: true
+  output_heatmap: false
+  y_axis:
+    mode: "per_well"
+    upper_padding: 1.10
+    rounding_mode: "nice_round"
+
+anti:
+  normalize: true
+  normalization_method: "column_max"
+  output_heatmap: false
+  y_axis:
+    mode: "per_well"
+    upper_padding: 1.10
+  output:
+    save_normalized_excitation: true
+    save_normalized_emission: true
+    save_grid_pdf: true
+    save_combined_report: true
+
+plot:
+  layout:
+    rows: 8
+    columns: 12
+  page_size: "A4"
+  orientation: "portrait"
+  marker_size: 1.0
+  line_width: 1.0
+  marker_alpha: 0.55
+  line_alpha: 0.95
+  smoothing:
+    enabled: true
+    method: "savgol"
+    window_length: 9
+    polyorder: 3
