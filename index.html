@@ -7,37 +7,40 @@
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
   <style>
     :root {
-      --ink: #1f2723;
-      --muted: #66736d;
-      --line: #dbe5df;
+      --ink: #20332d;
+      --muted: #62746d;
+      --line: #d7e8df;
       --panel: #ffffff;
-      --bg: #f6f8f6;
-      --green: #2f5d50;
-      --teal: #2f8f83;
+      --bg: #f4faf7;
+      --green: #245b4d;
+      --teal: #2b9a8a;
       --blue: #315f9f;
       --amber: #a86421;
       --red: #a33b3b;
-      --soft: #edf5f1;
+      --soft: #eaf7f1;
       --warm: #fff7ed;
       --purple: #7566a8;
+      --mist: #f8fcfa;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: var(--ink);
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 0 10%, rgba(43,154,138,.14), transparent 28rem),
+        linear-gradient(180deg, #f8fcfa 0%, var(--bg) 52%, #f7fbf8 100%);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       letter-spacing: 0;
     }
     .shell { display: grid; grid-template-columns: 270px minmax(0, 1fr); min-height: 100vh; }
-    aside { border-right: 1px solid var(--line); background: #fbfcfb; padding: 22px 18px; }
-    main { padding: 24px; max-width: 1180px; width: 100%; }
+    aside { border-right: 1px solid var(--line); background: rgba(251,253,251,.92); padding: 22px 18px; backdrop-filter: blur(12px); }
+    main { padding: 24px; max-width: 1280px; width: 100%; }
     .brand { font-size: 20px; font-weight: 800; color: var(--green); margin-bottom: 4px; }
     .sub { color: var(--muted); font-size: 13px; line-height: 1.45; margin-bottom: 18px; }
     .nav { display: grid; gap: 8px; }
     .nav button {
       width: 100%; min-height: 42px; text-align: left; border: 1px solid var(--line);
-      background: #fff; color: var(--ink); border-radius: 8px; padding: 0 12px; font-weight: 720;
+      background: rgba(255,255,255,.82); color: var(--ink); border-radius: 8px; padding: 0 12px; font-weight: 720;
     }
     .nav button.active { border-color: var(--green); background: var(--soft); color: var(--green); }
     .side-link {
@@ -60,7 +63,7 @@
       margin-bottom: 22px;
     }
     .hero-copy {
-      border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(180deg, #fff, #fbfdfb);
+      border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(180deg, #ffffff, #f8fcfa);
       padding: 24px; box-shadow: 0 12px 32px rgba(47, 93, 80, 0.06);
     }
     .eyebrow { color: var(--teal); font-weight: 820; font-size: 13px; margin-bottom: 8px; }
@@ -72,7 +75,7 @@
       border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 760;
     }
     .plate-wrap {
-      border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 18px;
+      border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(180deg, #fff, #fbfefc); padding: 18px;
       box-shadow: 0 12px 32px rgba(47, 93, 80, 0.06);
     }
     .plate-title { color: var(--green); font-weight: 820; margin-bottom: 12px; }
@@ -82,7 +85,7 @@
     .well.warm { background: var(--warm); border-color: #efd6b6; }
     .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
     .feature-card {
-      border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 16px;
+      border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.92); padding: 16px;
       min-height: 210px; display: flex; flex-direction: column; gap: 10px;
       box-shadow: 0 8px 24px rgba(47, 93, 80, 0.055);
     }
@@ -112,8 +115,21 @@
       width: 100%; border: 1px dashed #b8c9c0; border-radius: 8px; padding: 12px; background: #fbfdfb;
     }
     .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .row.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .check { display: flex; align-items: center; gap: 8px; margin-top: 28px; color: var(--ink); font-weight: 650; }
+    .check.inline { margin-top: 0; min-height: 40px; }
     .check input { width: 18px; height: 18px; }
+    input[type="range"] { width: 100%; accent-color: var(--green); }
+    input[type="color"] {
+      width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 7px;
+      background: #fff; padding: 4px;
+    }
+    .field-note { color: var(--muted); font-size: 12px; line-height: 1.45; margin-top: 6px; }
+    .section-title { margin: 18px 0 10px; color: var(--green); font-size: 15px; font-weight: 820; }
+    details.advanced { border: 1px solid var(--line); border-radius: 8px; background: #fbfdfb; padding: 12px; margin-top: 14px; }
+    details.advanced summary { cursor: pointer; color: var(--green); font-weight: 820; }
+    .compact-controls.hidden { display: none; }
     .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
     .primary, .secondary {
       min-height: 42px; border-radius: 8px; padding: 0 16px; font-weight: 780; cursor: pointer;
@@ -146,10 +162,10 @@
   <div class="shell">
     <aside>
       <div class="brand">HC PlateScope</div>
-      <div class="sub">Mac sharing package · browser edition<br>Python core unchanged</div>
-      <button class="side-link active" id="dashboardBtn" type="button">Dashboard</button>
+      <div class="sub">Mac 分享包 · 在线版<br>核心 Python 分析保持不变</div>
+      <button class="side-link active" id="dashboardBtn" type="button">仪表盘</button>
       <div class="nav" id="moduleNav"></div>
-      <div class="status" id="kernelStatus"><strong>Kernel</strong><br>等待初始化</div>
+      <div class="status" id="kernelStatus"><strong>计算内核</strong><br>等待初始化</div>
     </aside>
     <main>
       <section id="dashboardView"></section>
@@ -157,71 +173,90 @@
       <section id="workspaceView" class="hidden">
         <div class="top">
           <div>
-            <div class="breadcrumb">Dashboard / <span id="crumbTitle">Workspace</span></div>
+            <div class="breadcrumb">仪表盘 / <span id="crumbTitle">工作区</span></div>
             <h1 id="moduleTitle">HC PlateScope</h1>
             <p class="lede" id="moduleDesc">选择模块并上传数据文件。</p>
             <div class="tags" id="moduleTags"></div>
           </div>
-          <div class="mode-pill"><span>Data mode</span><strong id="moduleMode">Local-first analysis</strong></div>
+          <div class="mode-pill"><span>数据模式</span><strong id="moduleMode">本地浏览器分析</strong></div>
         </div>
         <div class="actions" style="margin: -6px 0 16px;">
-          <button class="secondary" id="backBtn" type="button">Back to Dashboard</button>
-          <button class="secondary" id="initBtn" type="button">Initialize Python</button>
+          <button class="secondary" id="backBtn" type="button">返回仪表盘</button>
+          <button class="secondary" id="initBtn" type="button">初始化 Python</button>
         </div>
 
       <form id="runForm" class="grid">
         <section class="panel span">
-          <div class="step-title">Step 1</div>
-          <h2>Upload files</h2>
+          <div class="step-title">步骤 1</div>
+          <h2>上传文件</h2>
+          <p class="lede" id="uploadHelp"></p>
           <div id="fileFields" class="grid"></div>
+          <div id="uploadInfo"></div>
         </section>
 
         <section class="panel span">
-          <div class="step-title">Step 2</div>
-          <h2>Run settings</h2>
+          <div class="step-title">步骤 2</div>
+          <h2>运行设置</h2>
           <div class="row">
             <div>
-              <label for="runName">Project name for this run</label>
-              <input id="runName" type="text" placeholder="Optional">
+              <label for="runName">本次项目名称</label>
+              <input id="runName" type="text" placeholder="可选">
             </div>
             <div>
-              <label for="plateFormat">Plate format</label>
+              <label for="plateFormat">孔板格式</label>
               <select id="plateFormat">
-                <option value="auto">Auto-detect</option>
-                <option value="96">96-well</option>
-                <option value="384">384-well</option>
+                <option value="auto">自动识别</option>
+                <option value="96">96 孔板</option>
+                <option value="384">384 孔板</option>
               </select>
             </div>
             <label class="check">
               <input id="autoStandardize" type="checkbox" checked>
-              Auto-standardize uploads
+              自动标准化上传文件
             </label>
           </div>
-          <div class="notice" style="margin-top: 12px;">Built-in Well ID Extractor can standardize raw plate-reader exports before GECO, LUCI, LSS, and ANTI analysis.</div>
+          <div class="row" id="spectraLayoutControls" style="margin-top: 12px;">
+            <div>
+              <label for="spectraMode">散点图排列方式</label>
+              <select id="spectraMode">
+                <option value="plate">孔板布局</option>
+                <option value="compact">紧凑布局</option>
+              </select>
+            </div>
+            <div class="compact-controls">
+              <label for="spectraColumns">每行图数</label>
+              <input id="spectraColumns" type="number" min="4" max="24" step="1" value="12">
+            </div>
+            <div class="compact-controls">
+              <label for="spectraRowsPerPage">每页 PDF 行数</label>
+              <input id="spectraRowsPerPage" type="number" min="2" max="16" step="1" value="8">
+            </div>
+          </div>
+          <div class="notice" style="margin-top: 12px;">内置 Well ID Extractor 可在 GECO、LUCI、LSS、ANTI 分析前，将原始读板仪导出文件转换为标准 well-by-column 表。</div>
         </section>
 
         <section class="panel span" id="moduleOptions"></section>
 
         <section class="panel span">
-          <div class="step-title">Step 3</div>
-          <h2>Run</h2>
+          <div class="step-title">步骤 3</div>
+          <h2>运行</h2>
           <div class="notice" id="runNotice">首次运行前需要初始化 Python。初始化会从 CDN 加载 Pyodide 和科学计算包。</div>
           <div class="actions">
-            <button class="primary" id="runBtn" type="submit" disabled>Run analysis</button>
-            <button class="secondary" id="downloadBtn" type="button" disabled>Download outputs.zip</button>
+            <button class="primary" id="runBtn" type="submit" disabled>运行分析</button>
+            <button class="secondary" id="downloadBtn" type="button" disabled>下载 outputs.zip</button>
           </div>
         </section>
       </form>
 
       <section class="panel result" id="resultPanel">
-        <div class="step-title">Step 4</div>
-        <h2>Results</h2>
+        <div class="step-title">步骤 4</div>
+        <h2>结果</h2>
         <div id="summary"></div>
         <ul class="files" id="fileList"></ul>
       </section>
 
       <section class="panel result" id="previewPanel">
-        <h2>Preview</h2>
+        <h2>结果预览</h2>
         <div class="table-wrap" id="preview"></div>
       </section>
       </section>
@@ -235,43 +270,48 @@
     const MODULES = {
       wellid: {
         title: "Well ID Extractor",
-        desc: "Convert raw plate-reader files into standardized well-by-column tables.",
-        tags: ["Standardization", "Well ID", "Excel export"],
+        desc: "将原始读板仪文件转换为标准 well-by-column 表。",
+        tags: ["标准化", "Well ID", "Excel 导出"],
         accent: "teal",
-        mode: "Raw reader export, standardized output",
-        files: [["input", "Upload Excel or CSV file"]],
+        mode: "原始导出转标准表",
+        uploadHelp: "支持格式：.xlsx、.xls、.csv。",
+        files: [["input", "上传 Excel 或 CSV 文件"]],
       },
       geco: {
         title: "GECO Analysis",
-        desc: "Compare with-CA and without-CA spectra and generate peak-ratio heatmaps.",
-        tags: ["Raw spectra", "Peak ratio", "Heatmap"],
+        desc: "比较 with-CA 与 without-CA 光谱，并生成峰值比值热图。",
+        tags: ["原始光谱", "峰值比值", "热图"],
         accent: "blue",
-        mode: "Raw spectra, peak ratio heatmap",
-        files: [["with_ca", "Upload with CA table"], ["without_ca", "Upload without CA table"]],
+        mode: "原始光谱，比值热图",
+        uploadHelp: "选择 96 孔双文件 GECO，或 384 孔单文件相邻配对 GECO。",
+        files: [["with_ca", "上传 with CA 表"], ["without_ca", "上传 without CA 表"]],
       },
       luci: {
         title: "LUCI Analysis",
-        desc: "Normalize spectra, detect 450/520 nm peaks, and calculate emission ratios.",
-        tags: ["Normalization", "Peak detection", "520:450"],
+        desc: "归一化光谱，识别 450/520 nm 峰，并计算发射比值。",
+        tags: ["归一化", "峰识别", "520:450"],
         accent: "orange",
-        mode: "Normalized spectra, 450/520 peak detection",
-        files: [["input", "Upload LUCI table"]],
+        mode: "归一化光谱，450/520 峰识别",
+        uploadHelp: "上传原始读板仪导出文件，或标准化后的 LUCI well-by-column 表。",
+        files: [["input", "上传 LUCI 表"]],
       },
       lss: {
         title: "LSS Analysis",
-        desc: "Overlay raw excitation and emission spectra for each well without normalization.",
-        tags: ["Raw overlay", "Excitation", "Emission"],
+        desc: "对每个孔叠加原始激发与发射光谱，不进行归一化。",
+        tags: ["原始叠图", "激发", "发射"],
         accent: "purple",
-        mode: "Raw spectra, no normalization",
-        files: [["emission", "Upload emission table"], ["excitation", "Upload excitation table"]],
+        mode: "原始光谱，不归一化",
+        uploadHelp: "上传 Excitation 与 Emission 两张表。LSS 始终使用原始信号值。",
+        files: [["emission", "上传 Emission 表"], ["excitation", "上传 Excitation 表"]],
       },
       anti: {
         title: "ANTI Analysis",
-        desc: "Normalize excitation and emission spectra, then overlay both signals for each well.",
-        tags: ["Normalized overlay", "Excitation", "Emission"],
+        desc: "分别归一化激发与发射光谱，并在每个孔中叠加两路信号。",
+        tags: ["归一化叠图", "激发", "发射"],
         accent: "teal",
-        mode: "Normalized excitation/emission overlay",
-        files: [["emission", "Upload emission table"], ["excitation", "Upload excitation table"]],
+        mode: "激发/发射分别归一化叠图",
+        uploadHelp: "上传 Excitation 与 Emission 两张表。两路信号会分别归一化。",
+        files: [["emission", "上传 Emission 表"], ["excitation", "上传 Excitation 表"]],
       },
     };
 
@@ -290,7 +330,7 @@
     }
 
     function setStatus(text) {
-      $("kernelStatus").innerHTML = "<strong>Kernel</strong><br>" + text;
+      $("kernelStatus").innerHTML = "<strong>计算内核</strong><br>" + text;
     }
 
     function setNotice(text, isError = false) {
@@ -343,36 +383,36 @@
           <h3>${escapeHtml(meta.title)}</h3>
           <p>${escapeHtml(meta.desc)}</p>
           <div class="tags">${tagHtml(meta.tags)}</div>
-          <button class="secondary" type="button" data-open-module="${escapeHtml(key)}">Start analysis</button>
+          <button class="secondary" type="button" data-open-module="${escapeHtml(key)}">进入分析</button>
         </article>
       `).join("");
       $("dashboardView").innerHTML = `
         <section class="hero">
           <div class="hero-copy">
-            <div class="eyebrow">Local-first scientific workspace</div>
+            <div class="eyebrow">本地优先的科学分析工作台</div>
             <h1>HC PlateScope</h1>
-            <p><strong>A cozy workspace for 96-well plate spectra analysis.</strong></p>
-            <p>Browser edition generated from the Mac sharing package. It keeps the Python analysis core unchanged while running in GitHub Pages through Pyodide.</p>
+            <p><strong>面向 96/384 孔板光谱数据的在线分析工作区。</strong></p>
+            <p>此在线版由 Mac 分享包生成，保留原始 Python 分析核心，通过 Pyodide 在浏览器中运行。</p>
             <div class="tags">
-              <span class="tag">Clean</span>
-              <span class="tag">Reproducible</span>
-              <span class="tag">Nature-style figures</span>
-              <span class="tag">outputs.zip download</span>
+              <span class="tag">清爽</span>
+              <span class="tag">可复现</span>
+              <span class="tag">论文风格图件</span>
+              <span class="tag">outputs.zip 下载</span>
             </div>
           </div>
           <div class="plate-wrap">
-            <div class="plate-title">96-well layout</div>
+            <div class="plate-title">96 孔板布局</div>
             <div class="plate-grid">${plateDecoration()}</div>
           </div>
         </section>
         <section>
-          <h2>Choose a workspace</h2>
-          <p class="lede">Start with a focused module. Each run produces tables, figures, metadata, logs, and a downloadable outputs.zip in the browser session.</p>
+          <h2>选择分析模块</h2>
+          <p class="lede">从一个模块开始。每次运行都会生成表格、图件、元数据、日志，并在浏览器会话中提供可下载的 outputs.zip。</p>
           <div class="cards">${cards}</div>
         </section>
         <section class="panel span" style="margin-top: 16px;">
-          <h2>Local-first notice</h2>
-          <div class="notice">This online build runs locally inside your browser. It does not upload input files to a server; refreshes clear the browser session outputs unless you download outputs.zip.</div>
+          <h2>本地运行说明</h2>
+          <div class="notice">在线版在你的浏览器中本地运行，不会把输入文件上传到服务器。刷新页面会清空当前会话输出，请及时下载 outputs.zip。</div>
         </section>
       `;
       for (const btn of document.querySelectorAll("[data-open-module]")) {
@@ -395,17 +435,47 @@
       }
     }
 
+    function renderPlateControls() {
+      const plate = $("plateFormat");
+      const current = plate.value;
+      if (activeModule === "geco") {
+        plate.innerHTML = `<option value="96">96 孔板</option><option value="384">384 孔板</option>`;
+        plate.value = current === "384" ? "384" : "96";
+      } else {
+        plate.innerHTML = `<option value="auto">自动识别</option><option value="96">96 孔板</option><option value="384">384 孔板</option>`;
+        plate.value = ["auto", "96", "384"].includes(current) ? current : "auto";
+      }
+
+      const allowLayout = activeModule !== "wellid";
+      $("spectraLayoutControls").classList.toggle("hidden", !allowLayout);
+      if (!allowLayout) return;
+      if (activeModule === "geco" && plate.value === "384") {
+        $("spectraMode").value = "compact";
+      }
+      const isCompact = $("spectraMode").value === "compact";
+      for (const el of document.querySelectorAll(".compact-controls")) {
+        el.classList.toggle("hidden", !isCompact);
+      }
+    }
+
     function renderFiles(meta) {
       const wrap = $("fileFields");
       wrap.innerHTML = "";
+      $("uploadHelp").textContent = meta.uploadHelp || "";
+      $("uploadInfo").innerHTML = "";
       const files = [...meta.files];
       if (activeModule === "geco" && $("plateFormat").value === "384") {
-        files.splice(0, files.length, ["input", "Upload 384-well paired GECO table"]);
+        files.splice(0, files.length, ["input", "上传 384 孔配对 GECO 表"]);
+        $("uploadInfo").innerHTML = `
+          <div class="notice" style="margin-top: 12px;">
+            <strong>GECO 384 配对规则</strong><br>
+            上传一张包含 A01-P24 well 列的表。奇数列按 without CA 处理，相邻偶数列按 with CA 处理。例如 A05 without CA 与 A06 with CA 会作为一组绘图。
+          </div>`;
       }
       for (const [key, label] of files) {
         const box = document.createElement("div");
         box.className = "panel";
-        box.innerHTML = `<label for="file_${key}">${label}</label><input id="file_${key}" data-file-key="${key}" type="file" accept=".xlsx,.xls,.csv">`;
+        box.innerHTML = `<label for="file_${key}">${label}</label><input id="file_${key}" data-file-key="${key}" type="file" accept=".xlsx,.xls,.csv"><div class="field-note">单文件 200MB 以内 · XLSX、XLS、CSV</div>`;
         wrap.appendChild(box);
       }
     }
@@ -414,21 +484,84 @@
       const section = $("moduleOptions");
       section.innerHTML = "";
       section.classList.remove("hidden");
-      if (activeModule === "luci") {
+      if (activeModule === "wellid") {
         section.innerHTML = `
-          <h2>Peak windows</h2>
-          <div class="row">
-            <div><label for="peak450Low">450 low</label><input id="peak450Low" type="number" value="430"></div>
-            <div><label for="peak450High">450 high</label><input id="peak450High" type="number" value="470"></div>
-            <div><label for="peak520Low">520 low</label><input id="peak520Low" type="number" value="500"></div>
-            <div><label for="peak520High">520 high</label><input id="peak520High" type="number" value="540"></div>
+          <div class="step-title">步骤 2</div>
+          <h2>识别设置</h2>
+          <p class="lede">Extractor 会识别常见波长列和 96/384 孔 well ID。</p>
+          <div class="row four" style="margin-top: 12px;">
+            <div><label>Well ID 范围</label><input type="text" value="A01-H12 或 A01-P24" disabled></div>
+            <label class="check inline"><input type="checkbox" checked disabled>自动识别波长列</label>
+            <div><label for="manualWavelength">手动波长列名</label><input id="manualWavelength" type="text" placeholder="可选"></div>
+            <div><label>输出文件格式</label><select disabled><option>xlsx</option></select></div>
           </div>`;
-      } else if (activeModule === "geco") {
-        section.innerHTML = `
-          <h2>GECO mode</h2>
-          <div class="notice">For 384-well mode, odd columns are treated as without CA and adjacent even columns as with CA.</div>`;
       } else {
-        section.classList.add("hidden");
+        const heatmap = activeModule !== "anti";
+        const smoothing = "启用平滑";
+        const colorLabels = {
+          geco: ["with CA 颜色", "without CA 颜色"],
+          luci: ["主曲线颜色", "辅助曲线颜色"],
+          lss: ["Emission 颜色", "Excitation 颜色"],
+          anti: ["Excitation 颜色", "Emission 颜色"],
+        }[activeModule] || ["主曲线颜色", "辅助曲线颜色"];
+        let moduleSpecific = "";
+        if (activeModule === "luci") {
+          moduleSpecific = `
+            <div class="section-title">峰窗口</div>
+            <label class="check inline"><input type="checkbox" checked disabled>按列最大值归一化</label>
+            <div class="row four" style="margin-top: 12px;">
+              <div><label for="peak450Low">450 nm 下限</label><input id="peak450Low" type="number" min="350" max="650" value="430"></div>
+              <div><label for="peak450High">450 nm 上限</label><input id="peak450High" type="number" min="350" max="650" value="470"></div>
+              <div><label for="peak520Low">520 nm 下限</label><input id="peak520Low" type="number" min="350" max="750" value="500"></div>
+              <div><label for="peak520High">520 nm 上限</label><input id="peak520High" type="number" min="350" max="750" value="540"></div>
+            </div>`;
+        } else if (activeModule === "lss") {
+          moduleSpecific = `<label class="check inline"><input type="checkbox" disabled>归一化数据</label>`;
+        } else if (activeModule === "anti") {
+          moduleSpecific = `<label class="check inline"><input type="checkbox" checked disabled>按列最大值归一化</label>`;
+        }
+        section.innerHTML = `
+          <div class="step-title">步骤 2</div>
+          <h2>分析设置</h2>
+          <p class="lede">常用参数直接显示；更细的绘图参数在高级设置里。</p>
+          ${moduleSpecific}
+          <div class="section-title">绘图控制</div>
+          <div class="row">
+            <label class="check inline"><input id="smoothEnabled" type="checkbox" checked>${smoothing}</label>
+            <div><label for="markerSize">散点大小</label><input id="markerSize" type="range" min="0.5" max="8" step="0.5" value="1"></div>
+            <div><label for="lineWidth">线宽</label><input id="lineWidth" type="range" min="0.2" max="3" step="0.1" value="1"></div>
+          </div>
+          <div class="row two" style="margin-top: 12px;">
+            <label class="check inline"><input id="perWellYAxis" type="checkbox" checked>每个 well 独立 y 轴</label>
+            <div><label for="yUpperPadding">Y 轴上方留白</label><input id="yUpperPadding" type="range" min="1" max="1.5" step="0.01" value="1.10"></div>
+          </div>
+          <div class="row two" style="margin-top: 12px; display: ${heatmap ? "grid" : "none"};">
+            <label class="check inline"><input id="showHeatmapValues" type="checkbox" checked>显示热图数值</label>
+            <label class="check inline"><input id="robustHeatmap" type="checkbox" checked>稳健热图色阶</label>
+          </div>
+          <details class="advanced">
+            <summary>高级设置</summary>
+            <div class="row" style="margin-top: 14px;">
+              <div><label for="smoothMethod">平滑方法</label><select id="smoothMethod"><option value="savgol">savgol</option></select></div>
+              <div><label for="windowLength">窗口长度</label><input id="windowLength" type="number" min="3" max="51" step="2" value="9"></div>
+              <div><label for="polyorder">多项式阶数</label><input id="polyorder" type="number" min="1" max="5" value="3"></div>
+            </div>
+            <div class="row" style="margin-top: 12px;">
+              <div><label for="markerAlpha">散点透明度</label><input id="markerAlpha" type="range" min="0.1" max="1" step="0.05" value="0.55"></div>
+              <div><label for="lineAlpha">线条透明度</label><input id="lineAlpha" type="range" min="0.1" max="1" step="0.05" value="0.95"></div>
+              <label class="check inline"><input id="niceRounding" type="checkbox" checked>启用漂亮取整</label>
+            </div>
+            <div class="row" style="margin-top: 12px;">
+              <div><label for="primaryColor">${colorLabels[0]}</label><input id="primaryColor" type="color" value="#0F4D92"></div>
+              <div><label for="secondaryColor">${colorLabels[1]}</label><input id="secondaryColor" type="color" value="#8BCF8B"></div>
+              <div><label for="badgeColor">${activeModule.toUpperCase()} 标记颜色</label><input id="badgeColor" type="color" value="${activeModule === "geco" ? "#42949E" : activeModule === "luci" ? "#9A4D8E" : activeModule === "lss" ? "#E28E2C" : "#42949E"}"></div>
+            </div>
+            <div class="row" style="margin-top: 12px; display: ${heatmap ? "grid" : "none"};">
+              <div><label for="heatmapColor">热图配色</label><select id="heatmapColor"><option value="hc_nature">hc_nature</option><option value="hc_soft">hc_soft</option><option value="YlGnBu">YlGnBu</option><option value="BuGn">BuGn</option><option value="viridis">viridis</option><option value="cividis">cividis</option><option value="plasma">plasma</option></select></div>
+              <div><label for="robustLow">低百分位</label><input id="robustLow" type="number" min="0" max="20" step="1" value="5"></div>
+              <div><label for="robustHigh">高百分位</label><input id="robustHigh" type="number" min="80" max="100" step="1" value="95"></div>
+            </div>
+          </details>`;
       }
     }
 
@@ -440,6 +573,7 @@
       $("moduleDesc").textContent = meta.desc;
       $("moduleTags").innerHTML = tagHtml(meta.tags);
       $("moduleMode").textContent = meta.mode;
+      renderPlateControls();
       $("autoStandardize").disabled = activeModule === "wellid";
       $("autoStandardize").checked = activeModule === "wellid" ? false : $("autoStandardize").checked;
       renderFiles(meta);
@@ -453,11 +587,11 @@
       $("initBtn").disabled = true;
       setStatus("加载 Pyodide...");
       pyodide = await loadPyodide();
-      setStatus("加载 Python 包...");
+      setStatus("加载科学计算包...");
       await pyodide.loadPackage(["numpy", "pandas", "matplotlib", "scipy", "pyyaml", "micropip"]);
       setStatus("加载 Excel 支持...");
       await pyodide.runPythonAsync("import micropip\nawait micropip.install(['openpyxl', 'xlrd'])");
-      setStatus("写入 HC PlateScope 模块...");
+      setStatus("写入 HC PlateScope 分析模块...");
       pyodide.FS.mkdirTree(`${BASE}/plate_processor`);
       pyodide.FS.mkdirTree(`${BASE}/browser_inputs`);
       pyodide.FS.mkdirTree(`${BASE}/outputs`);
@@ -484,7 +618,7 @@ if "${BASE}" not in sys.path:
     async function collectFiles() {
       const out = {};
       for (const input of document.querySelectorAll("input[type=file][data-file-key]")) {
-        if (!input.files.length) throw new Error(`Missing file: ${input.previousElementSibling.textContent}`);
+        if (!input.files.length) throw new Error(`缺少文件：${input.previousElementSibling.textContent}`);
         const file = input.files[0];
         const path = `${BASE}/browser_inputs/${Date.now()}_${safeName(file.name)}`;
         pyodide.FS.writeFile(path, new Uint8Array(await file.arrayBuffer()));
@@ -500,7 +634,35 @@ if "${BASE}" not in sys.path:
         plate_format: $("plateFormat").value,
         auto_standardize: $("autoStandardize").checked,
         files,
+        spectra_layout: activeModule === "wellid" ? null : {
+          mode: $("spectraMode").value,
+          columns: Number($("spectraColumns").value),
+          rows_per_page: Number($("spectraRowsPerPage").value),
+        },
       };
+      if (activeModule !== "wellid") {
+        payload.plot = {
+          smoothing_enabled: $("smoothEnabled").checked,
+          marker_size: Number($("markerSize").value),
+          line_width: Number($("lineWidth").value),
+          per_well_y_axis: $("perWellYAxis").checked,
+          y_upper_padding: Number($("yUpperPadding").value),
+          show_heatmap_values: $("showHeatmapValues") ? $("showHeatmapValues").checked : false,
+          robust_heatmap: $("robustHeatmap") ? $("robustHeatmap").checked : false,
+          smoothing_method: $("smoothMethod").value,
+          window_length: Number($("windowLength").value),
+          polyorder: Number($("polyorder").value),
+          marker_alpha: Number($("markerAlpha").value),
+          line_alpha: Number($("lineAlpha").value),
+          nice_rounding: $("niceRounding").checked,
+          primary_color: $("primaryColor").value,
+          secondary_color: $("secondaryColor").value,
+          badge_color: $("badgeColor").value,
+          heatmap_color: $("heatmapColor") ? $("heatmapColor").value : "hc_nature",
+          robust_low: $("robustLow") ? Number($("robustLow").value) : 5,
+          robust_high: $("robustHigh") ? Number($("robustHigh").value) : 95,
+        };
+      }
       if (activeModule === "luci") {
         payload.peak450 = [Number($("peak450Low").value), Number($("peak450High").value)];
         payload.peak520 = [Number($("peak520Low").value), Number($("peak520High").value)];
@@ -515,8 +677,8 @@ if "${BASE}" not in sys.path:
     function renderResult(result) {
       $("summary").innerHTML = `
         <div class="notice">
-          Run complete: <strong>${escapeHtml(result.run_id)}</strong><br>
-          Module: ${escapeHtml(result.module_type)} · Plate: ${escapeHtml(result.plate_format)} · Warnings: ${result.warnings.length}
+          运行完成：<strong>${escapeHtml(result.run_id)}</strong><br>
+          模块：${escapeHtml(result.module_type)} · 孔板：${escapeHtml(result.plate_format)} · 警告：${result.warnings.length}
         </div>`;
       const list = $("fileList");
       list.innerHTML = "";
@@ -559,8 +721,60 @@ cfg = load_config("config.yaml")
 cfg["run_name"] = req.get("run_name", "")
 plate_format = req.get("plate_format", "auto")
 cfg.setdefault("plate", {})["format"] = "auto" if plate_format == "auto" else int(plate_format)
+
+layout_req = req.get("spectra_layout") or {}
+if layout_req:
+    spectra_grid = cfg.setdefault("plotting", {}).setdefault("spectra_grid", {})
+    spectra_grid["mode"] = layout_req.get("mode", spectra_grid.get("mode", "compact"))
+    spectra_grid["columns"] = int(layout_req.get("columns", spectra_grid.get("columns", 12)))
+    spectra_grid["rows_per_page"] = int(layout_req.get("rows_per_page", spectra_grid.get("rows_per_page", 8)))
 if req.get("module") == "geco" and plate_format == "384":
     cfg.setdefault("plotting", {}).setdefault("spectra_grid", {})["mode"] = "compact"
+
+plot_req = req.get("plot") or {}
+if plot_req:
+    plotting = cfg.setdefault("plotting", {})
+    plot = cfg.setdefault("plot", {})
+    smoothing = plot.setdefault("smoothing", cfg.setdefault("smoothing", {}).copy())
+    smoothing["enabled"] = bool(plot_req.get("smoothing_enabled", True))
+    smoothing["method"] = plot_req.get("smoothing_method", "savgol")
+    smoothing["window_length"] = int(plot_req.get("window_length", 9))
+    smoothing["polyorder"] = int(plot_req.get("polyorder", 3))
+    cfg.setdefault("smoothing", {}).update(smoothing)
+    plot["marker_size"] = float(plot_req.get("marker_size", 1.0))
+    plot["line_width"] = float(plot_req.get("line_width", 1.0))
+    plot["marker_alpha"] = float(plot_req.get("marker_alpha", 0.55))
+    plot["line_alpha"] = float(plot_req.get("line_alpha", 0.95))
+    plot["smoothing"] = smoothing
+    plotting["marker_size"] = plot["marker_size"]
+    plotting["line_width"] = plot["line_width"]
+    plotting["alpha"] = plot["marker_alpha"]
+    plotting["line_alpha"] = plot["line_alpha"]
+    y_axis = plotting.setdefault("y_axis", {})
+    y_axis["per_well"] = bool(plot_req.get("per_well_y_axis", True))
+    y_axis["upper_padding"] = float(plot_req.get("y_upper_padding", 1.10))
+    y_axis["rounding_mode"] = "nice_round" if plot_req.get("nice_rounding", True) else "raw"
+    colors = plotting.setdefault("colors", {})
+    colors["primary"] = plot_req.get("primary_color", colors.get("primary", "#0F4D92"))
+    colors["secondary"] = plot_req.get("secondary_color", colors.get("secondary", "#8BCF8B"))
+    colors["heatmap"] = plot_req.get("heatmap_color", colors.get("heatmap", "hc_nature"))
+    heatmap = plotting.setdefault("heatmap", {})
+    heatmap["show_values"] = bool(plot_req.get("show_heatmap_values", True))
+    heatmap["robust_scaling"] = bool(plot_req.get("robust_heatmap", True))
+    heatmap["robust_lower_percentile"] = float(plot_req.get("robust_low", 5))
+    heatmap["robust_upper_percentile"] = float(plot_req.get("robust_high", 95))
+    badges = plotting.setdefault("badges", {})
+    module_key = req.get("module")
+    if module_key == "geco":
+        badges["geco_ratio"] = plot_req.get("badge_color", badges.get("geco_ratio", "#42949E"))
+    elif module_key == "luci":
+        badges["luci_ratio"] = plot_req.get("badge_color", badges.get("luci_ratio", "#9A4D8E"))
+    elif module_key == "lss":
+        badges["lss_distance"] = plot_req.get("badge_color", badges.get("lss_distance", "#E28E2C"))
+        cfg.setdefault("lss", {}).setdefault("y_axis", {})["upper_padding"] = y_axis["upper_padding"]
+        cfg.setdefault("lss", {}).setdefault("y_axis", {})["rounding_mode"] = y_axis["rounding_mode"]
+    elif module_key == "anti":
+        cfg.setdefault("anti", {}).setdefault("y_axis", {})["upper_padding"] = y_axis["upper_padding"]
 if req.get("module") == "luci":
     cfg.setdefault("peaks", {})["luci_450_window"] = req.get("peak450", [430, 470])
     cfg.setdefault("peaks", {})["luci_520_window"] = req.get("peak520", [500, 540])
@@ -667,6 +881,7 @@ json.dumps({
       URL.revokeObjectURL(url);
     });
     $("plateFormat").addEventListener("change", render);
+    $("spectraMode").addEventListener("change", renderPlateControls);
     renderDashboard();
     openDashboard();
   </script>
