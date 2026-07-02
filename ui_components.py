@@ -206,42 +206,13 @@ def render_pdf_preview(path: str | Path | None, title: str = "PDF preview") -> N
     if not pdf_path.exists() or pdf_path.suffix.lower() != ".pdf":
         return
     render_section(title)
-    pdf_bytes = pdf_path.read_bytes()
-    st.download_button(
-        "Download report PDF",
-        data=pdf_bytes,
-        file_name=pdf_path.name,
-        mime="application/pdf",
-        use_container_width=True,
-        key=f"download_report_{pdf_path.name}_{pdf_path.stat().st_mtime_ns}",
+    data = base64.b64encode(pdf_path.read_bytes()).decode("utf-8")
+    st.markdown(
+        f"""
+        <iframe class="hc-pdf-preview" src="data:application/pdf;base64,{data}#toolbar=0&navpanes=0&scrollbar=1"></iframe>
+        """,
+        unsafe_allow_html=True,
     )
-    try:
-        import pypdfium2 as pdfium
-
-        pdf = pdfium.PdfDocument(pdf_bytes)
-        if len(pdf) == 0:
-            render_info_card("Preview unavailable", ["The PDF does not contain any pages."], tone="warning")
-            return
-        page = pdf[0]
-        bitmap = page.render(scale=1.6)
-        st.image(
-            bitmap.to_pil(),
-            caption=f"{pdf_path.name} · page 1 preview",
-            use_container_width=True,
-        )
-    except Exception:
-        data = base64.b64encode(pdf_bytes).decode("utf-8")
-        st.markdown(
-            f"""
-            <object class="hc-pdf-preview" data="data:application/pdf;base64,{data}" type="application/pdf">
-                <div class="hc-info-card hc-warning">
-                    <strong>Preview unavailable</strong>
-                    <div>Use the download button above to open the PDF report.</div>
-                </div>
-            </object>
-            """,
-            unsafe_allow_html=True,
-        )
 
 
 def metadata_from_run_dir(run_dir: Path) -> dict:

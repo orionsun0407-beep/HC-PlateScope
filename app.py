@@ -13,6 +13,18 @@ import yaml
 
 from plate_processor.anti_analysis import run_anti_analysis
 from plate_processor.io import PlateFormatError, dataframe_to_excel_bytes, standardize_by_well
+from plate_processor.selected_well_plots import (
+    available_plot_wells,
+    build_plot_series,
+    default_quality_metric,
+    default_selected_wells,
+    preview_png_bytes,
+    safe_filename,
+    selected_summary,
+    summary_metric_columns,
+    zipped_data_bytes,
+    zipped_plot_bytes,
+)
 from plate_processor.report import run_geco, run_geco_384_paired, run_lss, run_luci, run_wellid
 from plate_processor.style import inject_css
 from plate_processor.ui_components import (
@@ -417,6 +429,123 @@ def render_result_common(result: dict | None, summary_items: dict[str, object], 
         render_pdf_preview(preview_pdf, "Report preview")
 
 
+def render_selected_well_plot_export(result: dict, summary: pd.DataFrame | None, module_key: str, module_label: str) -> None:
+    plot_series = build_plot_series(result, module_key)
+    wells = available_plot_wells(plot_series)
+    if not plot_series or not wells:
+        return
+    metadata = result.get("metadata", {})
+    run_id = str(metadata.get("run_id", "current"))
+    metrics = summary_metric_columns(summary)
+    default_metric = default_quality_metric(summary, module_key)
+    default_index = metrics.index(default_metric) if default_metric in metrics else 0
+
+    render_section(
+        "Selected well smooth scatter plots",
+        "Choose good wells, preview one plot, then export one independent figure per well.",
+    )
+    c1, c2, c3 = st.columns([1, 1, 1])
+    with c1:
+        if metrics:
+            metric = st.selectbox(
+                "Recommend wells by",
+                metrics,
+                index=default_index,
+                key=f"{module_key}_{run_id}_well_plot_metric",
+            )
+        else:
+            metric = None
+    with c2:
+        smooth = st.checkbox("Smooth curve", value=True, key=f"{module_key}_{run_id}_well_plot_smooth")
+    with c3:
+        tiff_dpi = st.selectbox("TIF resolution", [300, 600, 1200], index=1, key=f"{module_key}_{run_id}_well_plot_dpi")
+
+    default_wells = default_selected_wells(summary, module_key, wells, metric)
+    selected = st.multiselect(
+        "Good wells",
+        wells,
+        default=default_wells,
+        key=f"{module_key}_{run_id}_{metric or 'plate'}_well_plot_wells",
+    )
+    if not selected:
+        render_info_card("Selected well plots", ["Select at least one well to enable preview and downloads."], tone="warning")
+        return
+
+    window = st.slider(
+        "Smoothing window",
+        min_value=5,
+        max_value=51,
+        value=11,
+        step=2,
+        key=f"{module_key}_{run_id}_well_plot_window",
+        help="Odd Savitzky-Golay window length. Smaller values follow the raw points more closely.",
+    )
+
+    st.image(
+        preview_png_bytes(plot_series, selected[0], module_label, smooth=smooth, window_length=window),
+        caption=f"Preview: {module_label} {selected[0]}",
+        use_container_width=True,
+    )
+    st.dataframe(selected_summary(summary, selected), use_container_width=True, hide_index=True)
+
+    base_name = safe_filename(f"{run_id}_{module_label}_selected_well_plots")
+    svg_zip = zipped_plot_bytes(plot_series, selected, module_label, "svg", smooth=smooth, window_length=window)
+    pdf_zip = zipped_plot_bytes(plot_series, selected, module_label, "pdf", smooth=smooth, window_length=window)
+    tif_zip = zipped_plot_bytes(plot_series, selected, module_label, "tiff", smooth=smooth, window_length=window, dpi=int(tiff_dpi))
+    data_zip = zipped_data_bytes(plot_series, selected, module_label)
+
+    d1, d2, d3, d4 = st.columns(4)
+    with d1:
+        st.download_button(
+            "Download SVG ZIP",
+            data=svg_zip,
+            file_name=f"{base_name}_svg.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key=f"{module_key}_{run_id}_{metric or 'plate'}_well_svg",
+        )
+    with d2:
+        st.download_button(
+            "Download PDF ZIP",
+            data=pdf_zip,
+            file_name=f"{base_name}_pdf.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key=f"{module_key}_{run_id}_{metric or 'plate'}_well_pdf",
+        )
+    with d3:
+        st.download_button(
+            "Download TIF ZIP",
+            data=tif_zip,
+            file_name=f"{base_name}_tif.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key=f"{module_key}_{run_id}_{metric or 'plate'}_well_tif",
+        )
+    with d4:
+        st.download_button(
+            "Download Data ZIP",
+            data=data_zip,
+            file_name=f"{base_name}_data.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key=f"{module_key}_{run_id}_{metric or 'plate'}_well_data",
+        )
+
+    if st.button("Save selected well plots to run folder", key=f"{module_key}_{run_id}_{metric or 'plate'}_save_well_plots", use_container_width=True):
+        run_dir = result.get("run_dir") or metadata.get("output_dir")
+        if not run_dir:
+            render_info_card("Selected well plots", ["This run does not have a local output folder."], tone="warning")
+            return
+        export_dir = Path(run_dir) / "selected_well_plots"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        (export_dir / f"{base_name}_svg.zip").write_bytes(svg_zip)
+        (export_dir / f"{base_name}_pdf.zip").write_bytes(pdf_zip)
+        (export_dir / f"{base_name}_tif.zip").write_bytes(tif_zip)
+        (export_dir / f"{base_name}_data.zip").write_bytes(data_zip)
+        render_success_card(f"Selected well plots saved to {export_dir}")
+
+
 def dashboard_page() -> None:
     render_landing_page(int(st.session_state.get("recent_limit", 5)))
 
@@ -561,6 +690,7 @@ def geco_body(cfg: dict) -> None:
             report,
         )
         render_preview_table(summary, "Peak ratio preview")
+        render_selected_well_plot_export(result, summary, "geco", "GECO")
 
 
 def luci_body(cfg: dict) -> None:
@@ -610,6 +740,7 @@ def luci_body(cfg: dict) -> None:
             report,
         )
         render_preview_table(summary, "Peak summary preview")
+        render_selected_well_plot_export(result, summary, "luci", "LUCI")
 
 
 def lss_body(cfg: dict) -> None:
@@ -656,6 +787,7 @@ def lss_body(cfg: dict) -> None:
             report,
         )
         render_preview_table(summary, "LSS summary preview")
+        render_selected_well_plot_export(result, summary, "lss", "LSS")
 
 
 def anti_body(cfg: dict) -> None:
@@ -701,6 +833,7 @@ def anti_body(cfg: dict) -> None:
             report,
         )
         render_preview_table(summary, "Normalization summary preview")
+        render_selected_well_plot_export(result, summary, "anti", "ANTI")
 
 
 def remove_run_from_index(run_id: str) -> None:

@@ -155,7 +155,14 @@ def run_geco(with_ca_obj, without_ca_obj, with_ca_name: str, without_ca_name: st
         "warnings": warnings,
     }
     result = _finish_run(config, run, metadata, log + [f"Processed {len(wells)} common wells."] + warnings)
-    result.update({"summary": ratio_df, "output_files": result["metadata"]["output_files"]})
+    result.update(
+        {
+            "summary": ratio_df,
+            "with_ca": with_df[["Wavelength"] + wells],
+            "without_ca": without_df[["Wavelength"] + wells],
+            "output_files": result["metadata"]["output_files"],
+        }
+    )
     return result
 
 
@@ -249,7 +256,14 @@ def run_geco_384_paired(file_obj, filename: str, config: dict) -> dict:
         "warnings": warnings,
     }
     result = _finish_run(config, run, metadata, log + [f"Processed {len(pair_wells)} adjacent odd/even pairs."] + warnings)
-    result.update({"summary": ratio_df, "output_files": result["metadata"]["output_files"]})
+    result.update(
+        {
+            "summary": ratio_df,
+            "with_ca": with_df[["Wavelength"] + pair_wells],
+            "without_ca": without_df[["Wavelength"] + pair_wells],
+            "output_files": result["metadata"]["output_files"],
+        }
+    )
     return result
 
 
