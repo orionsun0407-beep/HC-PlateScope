@@ -303,27 +303,20 @@ def inject_css() -> None:
         }
 
         .hc-pdf-preview {
-          width: 100%;
+          display: block;
+          width: min(60%, 980px);
           height: 620px;
-          border: 1px solid var(--hc-border);
-          border-radius: 8px;
-          background: #FFFFFF;
-        }
-
-        .hc-pdf-image-preview {
-          width: min(82%, 1280px);
           margin: 1.1rem auto 0;
           border: 1px solid var(--hc-border);
           border-radius: 8px;
           background: #FFFFFF;
-          overflow: hidden;
           box-shadow: 0 12px 30px rgba(32, 55, 52, 0.08);
         }
 
-        .hc-pdf-image-preview img {
-          display: block;
-          width: 100%;
-          height: auto;
+        @media (max-width: 900px) {
+          .hc-pdf-preview {
+            width: 92%;
+          }
         }
 
         div.stButton > button,

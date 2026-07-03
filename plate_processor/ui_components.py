@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import html
 import json
-from io import BytesIO
 from pathlib import Path
 from typing import Iterable
 
@@ -308,33 +307,13 @@ def render_pdf_preview(path: str | Path | None, title: str = "PDF preview") -> N
         use_container_width=True,
         key=f"download_report_{pdf_path.name}_{pdf_path.stat().st_mtime_ns}",
     )
-    try:
-        import pypdfium2 as pdfium
-
-        pdf = pdfium.PdfDocument(pdf_bytes)
-        if len(pdf) == 0:
-            render_info_card("Preview unavailable", ["The PDF does not contain any pages."], tone="warning")
-            return
-        bitmap = pdf[0].render(scale=5.0)
-        image_buffer = BytesIO()
-        bitmap.to_pil().save(image_buffer, format="PNG", optimize=True)
-        image_data = base64.b64encode(image_buffer.getvalue()).decode("utf-8")
-        st.markdown(
-            f"""
-            <div class="hc-pdf-image-preview">
-              <img src="data:image/png;base64,{image_data}" alt="{_esc(pdf_path.name)} page 1 preview">
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    except Exception:
-        data = base64.b64encode(pdf_bytes).decode("utf-8")
-        st.markdown(
-            f"""
-            <iframe class="hc-pdf-preview" src="data:application/pdf;base64,{data}#toolbar=0&navpanes=0&scrollbar=1"></iframe>
-            """,
-            unsafe_allow_html=True,
-        )
+    data = base64.b64encode(pdf_bytes).decode("utf-8")
+    st.markdown(
+        f"""
+        <iframe class="hc-pdf-preview" src="data:application/pdf;base64,{data}#toolbar=0&navpanes=0&scrollbar=1"></iframe>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def metadata_from_run_dir(run_dir: Path) -> dict:
