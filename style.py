@@ -310,6 +310,22 @@ def inject_css() -> None:
           background: #FFFFFF;
         }
 
+        .hc-pdf-image-preview {
+          width: min(82%, 1280px);
+          margin: 1.1rem auto 0;
+          border: 1px solid var(--hc-border);
+          border-radius: 8px;
+          background: #FFFFFF;
+          overflow: hidden;
+          box-shadow: 0 12px 30px rgba(32, 55, 52, 0.08);
+        }
+
+        .hc-pdf-image-preview img {
+          display: block;
+          width: 100%;
+          height: auto;
+        }
+
         div.stButton > button,
         div.stDownloadButton > button {
           border-radius: 8px;
