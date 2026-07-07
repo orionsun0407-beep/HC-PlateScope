@@ -1,29 +1,35 @@
-# Streamlit 网页部署说明
+# GitHub Pages 在线部署说明
 
-这个版本保持原始 `app.py` UI 和原始 Python 分析功能，不做 GitHub Pages/Pyodide 改写。
+这个分支的默认入口是 `index.html`，可直接部署为 GitHub Pages 静态网页。网页界面由 HTML/CSS/JavaScript 实现，分析核心通过 Pyodide 在用户浏览器中运行，不需要 Streamlit 服务器。
 
 ## 推荐部署方式
 
-使用 Streamlit Community Cloud：
+使用 GitHub Pages：
 
-1. 将本目录上传到 GitHub 仓库。
-2. 在 Streamlit Community Cloud 选择 `New app`。
-3. 选择刚上传的仓库和分支。
-4. Main file path 填写 `app.py`。
-5. 点击部署。
+1. 将本目录推送到 GitHub 仓库。
+2. 打开仓库 `Settings`。
+3. 进入 `Pages`。
+4. `Build and deployment` 选择 `Deploy from a branch`。
+5. Branch 选择 `streamlit-online`，目录选择 `/ (root)`。
+6. 保存后等待 GitHub Pages 构建完成。
 
-部署后，用户打开网页即可使用原 Streamlit 界面，不需要手动初始化 Python。
+部署完成后，访问 GitHub Pages 生成的链接即可使用在线版。
 
-## 需要上传的核心文件
+## 在线版入口文件
 
-- `app.py`
+- `index.html`
+- `styles.css`
+- `app-core.js`
+- `app-dashboard.js`
+- `app-init.js`
+- `app-options.js`
+- `app-run.js`
 - `config.yaml`
-- `requirements.txt`
 - `plate_processor/`
-- `run_analysis.py`
-- `style.py`
-- `ui_components.py`
-- `README.md`
+
+## 运行方式
+
+在线版不会启动 Python 后端，也不会上传输入文件到服务器。首次运行分析时，浏览器会从 CDN 加载 Pyodide 和科学计算包，然后在浏览器本地执行 `plate_processor/` 中的 Python 分析代码。
 
 ## 不要上传的本地运行产物
 
@@ -34,6 +40,6 @@
 
 这些已经写入 `.gitignore`。
 
-## 为什么不是 GitHub Pages
+## Streamlit 备用说明
 
-GitHub Pages 只能托管静态 HTML/CSS/JavaScript，不能直接运行 Streamlit 和 Python 后端。要完全保留当前 UI 和功能，应部署为 Streamlit 应用，而不是静态 GitHub Pages 页面。
+仓库仍保留 `app.py`、`start.command` 和本地 Streamlit 相关文件，作为本地运行或回退版本。GitHub Pages 在线版不依赖 Streamlit。

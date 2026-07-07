@@ -1,24 +1,22 @@
 # HC PlateScope
 
-A cozy workspace for 96-well plate spectra analysis.
+A browser-based workspace for 96/384-well plate spectra analysis.
 
-HC PlateScope 是一个本地运行的 96 孔板荧光/发光数据处理工具，包含 Python 后端、Streamlit 网页界面、命令行入口和可追溯的 `outputs/` 历史记录系统。界面风格强调 clean、cozy、scientific、local-first 和可复现输出。
+HC PlateScope 是一个可直接部署到 GitHub Pages 的孔板光谱分析工具。默认入口是 `index.html`，界面由 HTML/CSS/JavaScript 实现，核心分析仍复用 `plate_processor/` 中的 Python 代码，并通过 Pyodide 在用户浏览器中本地运行。输入文件不会上传到服务器。
 
 ## 上传 GitHub 后部署成网页工具
 
-如果希望用户打开网页即可使用、并且不需要在浏览器里手动初始化 Python，请把这个仓库部署到 Streamlit Community Cloud、Hugging Face Spaces Streamlit SDK、Render 或其他支持 Streamlit 的 Python Web 服务。
+推荐使用 GitHub Pages：
 
-这种方式会完整保留当前 `app.py` 的原始 UI 和所有 Python 分析功能。用户访问的是已经运行好的 Streamlit 网页，不需要看到或点击任何 Python 初始化步骤。
+1. 将本目录推送到 GitHub 仓库。
+2. 打开仓库 `Settings` → `Pages`。
+3. `Build and deployment` 选择 `Deploy from a branch`。
+4. Branch 选择 `streamlit-online`，目录选择 `/ (root)`。
+5. 保存后等待 GitHub Pages 构建完成。
 
-最简单的 Streamlit Community Cloud 流程：
+GitHub Pages 在线版会直接打开 `index.html`，不依赖 Streamlit。首次运行分析时，浏览器会加载 Pyodide 和科学计算包，随后所有分析在本机浏览器中完成，并生成可下载的 `outputs.zip`、PDF、SVG、TIF 和表格文件。
 
-1. 将本目录上传到 GitHub 仓库。
-2. 保留 `app.py`、`config.yaml`、`plate_processor/`、`requirements.txt`、`README.md` 和其他原始 Python 文件。
-3. 不要上传 `.venv/`、`outputs/`、`__pycache__/`、`.DS_Store`，这些已经写入 `.gitignore`。
-4. 在 Streamlit Community Cloud 新建应用，选择这个 GitHub 仓库。
-5. Main file path 填写 `app.py`。
-
-GitHub Pages 只能托管静态网页，不能直接运行这个 Streamlit/Python 工具。若强行做成 GitHub Pages，需要把分析和 UI 另写成 JavaScript 或 Pyodide 版本，这会改变运行方式，也不符合“UI 不改动”的要求。
+仓库仍保留 `app.py` 和本地 Streamlit 相关文件，作为本地运行或回退版本；GitHub Pages 在线版不使用这些文件。
 
 ## 安装
 
