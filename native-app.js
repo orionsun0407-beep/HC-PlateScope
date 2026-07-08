@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-08-native3";
+  const APP_VERSION = "2026-07-08-native5";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -795,13 +795,21 @@
   function combineReportSvg(title, grid, heatmap) {
     const gridBox = svgSize(grid);
     const heatBox = svgSize(heatmap);
-    const width = Math.max(gridBox.width, heatBox.width) + 40;
-    const height = 58 + gridBox.height + heatBox.height + 42;
+    const width = 794;
+    const height = 1123;
+    const gridMaxW = 734;
+    const gridMaxH = 650;
+    const heatMaxW = 680;
+    const heatMaxH = 360;
+    const gridScale = Math.min(gridMaxW / gridBox.width, gridMaxH / gridBox.height);
+    const heatScale = Math.min(heatMaxW / heatBox.width, heatMaxH / heatBox.height);
+    const gridX = (width - gridBox.width * gridScale) / 2;
+    const heatX = (width - heatBox.width * heatScale) / 2;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
       <text x="${width / 2}" y="30" text-anchor="middle" font-size="22" font-weight="700" fill="#111">${esc(title)}</text>
-      <g transform="translate(20 50)">${stripSvg(grid)}</g>
-      <g transform="translate(20 ${60 + gridBox.height})">${stripSvg(heatmap)}</g>
+      <g transform="translate(${gridX.toFixed(2)} 58) scale(${gridScale.toFixed(4)})">${stripSvg(grid)}</g>
+      <g transform="translate(${heatX.toFixed(2)} 742) scale(${heatScale.toFixed(4)})">${stripSvg(heatmap)}</g>
     </svg>`;
   }
 
@@ -829,6 +837,37 @@
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     return XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  }
+
+  function workbookToXlsxBytes(sheets) {
+    const wb = XLSX.utils.book_new();
+    for (const sheet of sheets) {
+      const rows = sheet.rows || [];
+      const columns = sheet.columns || Object.keys(rows[0] || {});
+      const aoa = [columns, ...rows.map((row) => columns.map((col) => Number.isNaN(row[col]) ? "" : row[col]))];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheet.name.slice(0, 31));
+    }
+    return XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  }
+
+  function configToYaml(value, indent = 0) {
+    const pad = " ".repeat(indent);
+    if (Array.isArray(value)) {
+      return value.map((item) => `${pad}- ${typeof item === "object" && item !== null ? `\n${configToYaml(item, indent + 2)}` : yamlScalar(item)}`).join("\n");
+    }
+    if (value && typeof value === "object") {
+      return Object.entries(value).map(([key, item]) => {
+        if (item && typeof item === "object") return `${pad}${key}:\n${configToYaml(item, indent + 2)}`;
+        return `${pad}${key}: ${yamlScalar(item)}`;
+      }).join("\n");
+    }
+    return `${pad}${yamlScalar(value)}`;
+  }
+
+  function yamlScalar(value) {
+    if (value === null || value === undefined) return "null";
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    return JSON.stringify(String(value));
   }
 
   async function svgToPngDataUrl(svg, scale = 2) {
@@ -895,14 +934,13 @@
       folder.file(name, file.bytes);
     }
     zip.file("run_metadata.json", JSON.stringify(result.metadata, null, 2));
-    zip.file("config_snapshot.json", JSON.stringify(result.config, null, 2));
+    zip.file("config_snapshot.yaml", configToYaml(result.config));
     zip.file("processing_log.txt", result.log.join("\n"));
     return zip.generateAsync({ type: "blob" });
   }
 
   async function addFigureFiles(files, basePath, svg) {
-    files.push({ path: `${basePath}.svg`, bytes: new TextEncoder().encode(svg), previewSvg: svg });
-    files.push({ path: `${basePath}.pdf`, bytes: await svgToPdfBytes(svg) });
+    files.push({ path: `${basePath}.pdf`, bytes: await svgToPdfBytes(svg), previewSvg: svg });
   }
 
   function selectedWellSeries(result) {
@@ -1067,9 +1105,18 @@
     const grid = gridSvg({ title: "LSS raw spectra", tables: [emission, excitation], labels: ["Emission", "Excitation"], wells, config, moduleKey: "lss", highlights });
     const heatSvg = heatmapSvg(heat, config, "LSS Stokes shift", "Stokes shift (nm)");
     const reportSvg = combineReportSvg("LSS raw spectra and Stokes shift heatmap", grid, heatSvg);
+    const columns = Object.keys(summary[0] || {});
     const files = [
       { path: "tables/LSS_summary.csv", bytes: csvBytes(summary) },
-      { path: "tables/LSS_peak_top10.xlsx", bytes: tableToXlsxBytes({ columns: Object.keys(summary[0] || {}), rows: summary }, "all_wells") },
+      {
+        path: "tables/LSS_peak_top10.xlsx",
+        bytes: workbookToXlsxBytes([
+          { name: "all_wells", columns, rows: summary },
+          { name: "emission_top10", columns, rows: summary.filter((row) => row.emission_top10) },
+          { name: "excitation_top10", columns, rows: summary.filter((row) => row.excitation_top10) },
+          { name: "LSS_distance_top10", columns, rows: summary.filter((row) => row.peak_distance_top10) },
+        ]),
+      },
     ];
     await addFigureFiles(files, "figures/LSS_grid_plots", grid);
     await addFigureFiles(files, "figures/LSS_peak_distance_heatmap", heatSvg);
@@ -1112,7 +1159,7 @@
       run_name: config.run_name || "",
       parameters: config,
       output_dir: `${config.output.base_dir}/${id}`,
-      output_files: files.map((file) => file.path).concat(["run_metadata.json", "config_snapshot.json", "processing_log.txt"]),
+      output_files: files.map((file) => file.path).concat(["run_metadata.json", "config_snapshot.yaml", "processing_log.txt"]),
       warnings,
       ...metadataExtra,
     };
@@ -1151,9 +1198,14 @@
         </div>
         <div class="hc-plate-wrap"><div class="hc-plate-title">96-well layout</div><div class="hc-plate-grid">${plateDecoration()}</div></div>
       </div>
-      ${section("Choose a workspace", "Start with a focused module. Each run creates tables, figures, reports, metadata, logs, and config snapshots in a downloadable run package.")}
-      <div class="feature-grid">${["wellid", "geco", "luci", "lss", "anti"].map(featureCard).join("")}
-        <div class="hc-feature-card hc-accent-teal"><div class="hc-accent-line"></div><h3>Analysis History</h3><p>Browse browser-local runs, metadata, reports, and restored settings.</p><div class="hc-tags"><span class="hc-tag">history</span><span class="hc-tag">metadata</span><span class="hc-tag">settings</span></div><button class="card-button" data-page="history">Open history</button><button class="card-button" data-page="settings">Settings</button></div>
+      ${section("Choose a workspace", "Start with a focused module. Each run saves inputs, figures, tables, metadata, logs, and config snapshots locally.")}
+      <div class="feature-grid dashboard-row">${["wellid", "geco", "luci"].map(featureCard).join("")}</div>
+      <div class="feature-grid dashboard-row">${["lss", "anti"].map(featureCard).join("")}
+        <div class="feature-slot">
+          <div class="hc-feature-card hc-accent-teal"><div class="hc-accent-line"></div><h3>Analysis History</h3><p>Browse browser-local runs, metadata, reports, and restored settings.</p><div class="hc-tags"><span class="hc-tag">history</span><span class="hc-tag">metadata</span><span class="hc-tag">settings</span></div></div>
+          <button class="card-button" data-page="history">Open history</button>
+          <button class="card-button" data-page="settings">Settings</button>
+        </div>
       </div>
       <div class="two-col">
         <div>${section("Recent runs", "Latest browser-local records.")}${historyPreview()}</div>
@@ -1177,7 +1229,7 @@
 
   function featureCard(key) {
     const m = MODULES[key];
-    return `<div class="hc-feature-card hc-accent-${m.accent}"><div class="hc-accent-line"></div><h3>${esc(m.title)}</h3><p>${esc(m.description)}</p><div class="hc-tags">${m.tags.map((tag) => `<span class="hc-tag">${esc(tag)}</span>`).join("")}</div><button class="card-button" data-module="${key}">Start analysis</button></div>`;
+    return `<div class="feature-slot"><div class="hc-feature-card hc-accent-${m.accent}"><div class="hc-accent-line"></div><h3>${esc(m.title)}</h3><p>${esc(m.description)}</p><div class="hc-tags">${m.tags.map((tag) => `<span class="hc-tag">${esc(tag)}</span>`).join("")}</div></div><button class="card-button" data-module="${key}">Start analysis</button></div>`;
   }
 
   function historyPreview() {
@@ -1255,11 +1307,29 @@
       </div>`;
   }
 
+  function wellIdControls() {
+    const today = new Date().toISOString().slice(0, 10);
+    return `
+      ${step(2, "Detection settings", "The extractor recognizes common wavelength columns and 96/384-well IDs.")}
+      <div class="panel">
+        <div class="grid four">
+          <div><label>Plate format</label><select id="wellid_plate"><option value="auto">Auto-detect</option><option value="96">96-well</option><option value="384">384-well</option></select></div>
+          <div><label>Well ID pattern</label><input value="A01-H12 or A01-P24" disabled></div>
+          <label class="check"><input type="checkbox" checked disabled> Auto-detect wavelength column</label>
+          <div><label>Manual wavelength column name</label><input placeholder="Optional" disabled></div>
+        </div>
+        <div class="grid two">
+          <div><label>Output file format</label><select disabled><option>xlsx</option></select></div>
+          <div><label>Project name for this run</label><input id="wellid_run_name" value="Well ID ${today}"></div>
+        </div>
+      </div>`;
+  }
+
   function moduleBody(module) {
     if (module === "wellid") {
       return `${step(1, "Upload raw file", "Supported formats: .xlsx, .xls, .csv.")}
         <div class="panel">${fileField("wellid_upload", "Upload Excel or CSV file")}</div>
-        ${commonControls("wellid", { subtitle: "The extractor recognizes common wavelength columns and 96/384-well IDs." })}
+        ${wellIdControls()}
         ${runStep("Run Well ID Extraction")}`;
     }
     if (module === "geco") {
@@ -1300,7 +1370,7 @@
     if (module === "geco") renderGecoFiles();
     document.querySelectorAll("input[type=file]").forEach((input) => input.addEventListener("change", () => {
       const note = $(`${input.id}_note`);
-      if (note && input.files[0]) note.innerHTML = `<span class="file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span></span>`;
+      if (note && input.files[0]) note.innerHTML = `<span class="hc-file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span><span>${esc(input.files[0].name.split(".").pop().toUpperCase())}</span></span>`;
     }));
   }
 
@@ -1311,7 +1381,7 @@
       : `<div class="grid two">${fileField("geco_with", "Upload with CA table")}${fileField("geco_without", "Upload without CA table")}</div>`;
     $("gecoFiles").querySelectorAll("input[type=file]").forEach((input) => input.addEventListener("change", () => {
       const note = $(`${input.id}_note`);
-      if (note && input.files[0]) note.innerHTML = `<span class="file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span></span>`;
+      if (note && input.files[0]) note.innerHTML = `<span class="hc-file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span><span>${esc(input.files[0].name.split(".").pop().toUpperCase())}</span></span>`;
     }));
   }
 
@@ -1390,7 +1460,7 @@
         <ul class="file-list">${result.metadata.output_files.map((file) => `<li><span>${esc(file)}</span></li>`).join("")}</ul>
       </div>
       <div class="panel"><h2>${esc(summaryName)}</h2>${tableHtml(result.summary.slice(0, 100))}</div>
-      ${report ? `<div class="panel"><h2>Report preview</h2><div class="preview-card">${report.previewSvg}</div></div>` : ""}
+      ${report ? `<div class="panel"><h2>Report preview</h2><div class="hc-pdf-preview">${report.previewSvg}</div></div>` : ""}
       ${selectedWellPanel(result)}
     `;
     $("downloadZip").addEventListener("click", async () => downloadBlob(await buildOutputsZip(result), `${result.id}_outputs.zip`, "application/zip"));
