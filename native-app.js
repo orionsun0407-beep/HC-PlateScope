@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-08-native";
+  const APP_VERSION = "2026-07-08-native2";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
