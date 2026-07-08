@@ -1,121 +1,33 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HC PlateScope HTML</title>
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
-  <link rel="stylesheet" href="styles.css">
+  <title>HC PlateScope</title>
+  <link rel="stylesheet" href="styles.css?v=2026-07-08-native">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
 </head>
 <body>
-  <div class="shell">
-    <aside>
-      <div class="brand">HC PlateScope</div>
-      <div class="sub">Mac 分享包 · 在线版<br>核心 Python 分析保持不变</div>
-      <button class="side-link active" id="dashboardBtn" type="button">仪表盘</button>
-      <div class="nav" id="moduleNav"></div>
-      <div class="status" id="kernelStatus"><strong>计算内核</strong><br>等待初始化</div>
-    </aside>
-    <main>
-      <section id="dashboardView"></section>
+  <aside class="sidebar">
+    <div class="hc-side-title">HC PlateScope</div>
+    <div class="hc-side-note">Local-first workspace<br>Runs stay in this browser<br>Version 2.0.0</div>
+    <hr>
+    <label class="side-check"><input id="debugMode" type="checkbox"> Debug mode</label>
+    <p class="side-caption" id="currentWorkspace">Current workspace: Dashboard</p>
+    <p class="side-caption" id="latestRun">Latest run: none</p>
+  </aside>
 
-      <section id="workspaceView" class="hidden">
-        <div class="top">
-          <div>
-            <div class="breadcrumb">仪表盘 / <span id="crumbTitle">工作区</span></div>
-            <h1 id="moduleTitle">HC PlateScope</h1>
-            <p class="lede" id="moduleDesc">选择模块并上传数据文件。</p>
-            <div class="tags" id="moduleTags"></div>
-          </div>
-          <div class="mode-pill"><span>数据模式</span><strong id="moduleMode">本地浏览器分析</strong></div>
-        </div>
-        <div class="actions" style="margin: -6px 0 16px;">
-          <button class="secondary" id="backBtn" type="button">返回仪表盘</button>
-          <button class="secondary" id="initBtn" type="button">初始化 Python</button>
-        </div>
+  <main class="main">
+    <section id="dashboard"></section>
+    <section id="workspace" class="hidden"></section>
+  </main>
 
-      <form id="runForm" class="grid">
-        <section class="panel span">
-          <div class="step-title">步骤 1</div>
-          <h2>上传文件</h2>
-          <p class="lede" id="uploadHelp"></p>
-          <div id="fileFields" class="grid"></div>
-          <div id="uploadInfo"></div>
-        </section>
-
-        <section class="panel span">
-          <div class="step-title">步骤 2</div>
-          <h2>运行设置</h2>
-          <div class="row">
-            <div>
-              <label for="runName">本次项目名称</label>
-              <input id="runName" type="text" placeholder="可选">
-            </div>
-            <div>
-              <label for="plateFormat">孔板格式</label>
-              <select id="plateFormat">
-                <option value="auto">自动识别</option>
-                <option value="96">96 孔板</option>
-                <option value="384">384 孔板</option>
-              </select>
-            </div>
-            <label class="check">
-              <input id="autoStandardize" type="checkbox" checked>
-              自动标准化上传文件
-            </label>
-          </div>
-          <div class="row" id="spectraLayoutControls" style="margin-top: 12px;">
-            <div>
-              <label for="spectraMode">散点图排列方式</label>
-              <select id="spectraMode">
-                <option value="plate">孔板布局</option>
-                <option value="compact">紧凑布局</option>
-              </select>
-            </div>
-            <div class="compact-controls">
-              <label for="spectraColumns">每行图数</label>
-              <input id="spectraColumns" type="number" min="4" max="24" step="1" value="12">
-            </div>
-            <div class="compact-controls">
-              <label for="spectraRowsPerPage">每页 PDF 行数</label>
-              <input id="spectraRowsPerPage" type="number" min="2" max="16" step="1" value="8">
-            </div>
-          </div>
-          <div class="notice" style="margin-top: 12px;">内置 Well ID Extractor 可在 GECO、LUCI、LSS、ANTI 分析前，将原始读板仪导出文件转换为标准 well-by-column 表。</div>
-        </section>
-
-        <section class="panel span" id="moduleOptions"></section>
-
-        <section class="panel span">
-          <div class="step-title">步骤 3</div>
-          <h2>运行</h2>
-          <div class="notice" id="runNotice">首次运行前需要初始化 Python。初始化会从 CDN 加载 Pyodide 和科学计算包。</div>
-          <div class="actions">
-            <button class="primary" id="runBtn" type="submit" disabled>运行分析</button>
-            <button class="secondary" id="downloadBtn" type="button" disabled>下载 outputs.zip</button>
-          </div>
-        </section>
-      </form>
-
-      <section class="panel result" id="resultPanel">
-        <div class="step-title">步骤 4</div>
-        <h2>结果</h2>
-        <div id="summary"></div>
-        <ul class="files" id="fileList"></ul>
-      </section>
-
-      <section class="panel result" id="previewPanel">
-        <h2>结果预览</h2>
-        <div class="table-wrap" id="preview"></div>
-      </section>
-      </section>
-    </main>
-  </div>
-
-  <script src="app-core.js"></script>
-  <script src="app-dashboard.js"></script>
-  <script src="app-options.js"></script>
-  <script src="app-init.js"></script>
-  <script src="app-run.js"></script>
+  <div id="scratch" aria-hidden="true"></div>
+  <script src="native-app.js?v=2026-07-08-native"></script>
 </body>
 </html>
