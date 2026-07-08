@@ -1,3 +1,4 @@
+    const APP_VERSION = "2026-07-08-cmap-fix";
     const PY_FILE_PATHS = ['plate_processor/__init__.py', 'plate_processor/analysis_common.py', 'plate_processor/anti_analysis.py', 'plate_processor/io.py', 'plate_processor/logging_utils.py', 'plate_processor/lss_analysis.py', 'plate_processor/peak_analysis.py', 'plate_processor/plotting.py', 'plate_processor/preprocessing.py', 'plate_processor/report.py', 'plate_processor/selected_well_plots.py', 'plate_processor/utils.py'];
     const CONFIG_PATH = "config.yaml";
     const BASE = "/home/pyodide/hc_platescope";
@@ -56,6 +57,10 @@
     let latestWellPlotInfo = null;
 
     const $ = (id) => document.getElementById(id);
+
+    function assetUrl(path) {
+      return `${path}?v=${encodeURIComponent(APP_VERSION)}`;
+    }
 
     function b64ToBytes(value) {
       const binary = atob(value);

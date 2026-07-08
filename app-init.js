@@ -12,11 +12,11 @@
       pyodide.FS.mkdirTree(`${BASE}/browser_inputs`);
       pyodide.FS.mkdirTree(`${BASE}/outputs`);
       for (const path of PY_FILE_PATHS) {
-        const response = await fetch(path);
+        const response = await fetch(assetUrl(path), { cache: "no-store" });
         if (!response.ok) throw new Error(`无法加载分析核心文件：${path}`);
         pyodide.FS.writeFile(`${BASE}/${path}`, await response.text(), { encoding: "utf8" });
       }
-      const configResponse = await fetch(CONFIG_PATH);
+      const configResponse = await fetch(assetUrl(CONFIG_PATH), { cache: "no-store" });
       if (!configResponse.ok) throw new Error("无法加载配置文件：config.yaml");
       pyodide.FS.writeFile(`${BASE}/config.yaml`, await configResponse.text(), { encoding: "utf8" });
       await pyodide.runPythonAsync(`

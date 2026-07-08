@@ -29,6 +29,32 @@ NATURE_PALETTE = {
     "neutral_dark": "#4D4D4D",
 }
 
+CUSTOM_HEATMAPS = {
+    "hc_soft": ["#F8FBF8", "#DDEFE8", "#9FD1C4", "#5F9FBE", "#E6A15C"],
+    "hc_nature": ["#F7FBF8", "#DDF3DE", "#AADCA9", "#3775BA", "#B64342"],
+}
+
+
+def _custom_colormap(name: str):
+    return LinearSegmentedColormap.from_list(name, CUSTOM_HEATMAPS[name])
+
+
+def _register_custom_colormaps() -> None:
+    for name in CUSTOM_HEATMAPS:
+        cmap = _custom_colormap(name)
+        try:
+            mpl.colormaps.register(cmap, name=name, force=True)
+        except TypeError:
+            try:
+                mpl.colormaps.register(cmap, name=name)
+            except ValueError:
+                pass
+        except ValueError:
+            pass
+
+
+_register_custom_colormaps()
+
 
 def _plotting_config(config: dict) -> dict:
     plotting = dict(config.get("plotting", {}))
@@ -93,16 +119,8 @@ def _y_label(normalized: bool) -> str:
 
 
 def _heatmap_cmap(name: str):
-    if name == "hc_soft":
-        return LinearSegmentedColormap.from_list(
-            "hc_soft",
-            ["#F8FBF8", "#DDEFE8", "#9FD1C4", "#5F9FBE", "#E6A15C"],
-        )
-    if name == "hc_nature":
-        return LinearSegmentedColormap.from_list(
-            "hc_nature",
-            ["#F7FBF8", "#DDF3DE", "#AADCA9", "#3775BA", "#B64342"],
-        )
+    if name in CUSTOM_HEATMAPS:
+        return _custom_colormap(name)
     return plt.get_cmap(name)
 
 
