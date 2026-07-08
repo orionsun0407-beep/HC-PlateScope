@@ -6,6 +6,14 @@
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
   const CONFIG_KEY = "hc_platescope_native_config";
+  const LIBS = {
+    xlsx: { url: "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js", test: () => window.XLSX },
+    papa: { url: "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js", test: () => window.Papa },
+    zip: { url: "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js", test: () => window.JSZip },
+    pdf: { url: "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js", test: () => window.jspdf },
+    tiff: { url: "https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js", test: () => window.UTIF },
+  };
+  const libPromises = {};
 
   const DEFAULT_CONFIG = {
     project: { name: "HC PlateScope", version: "2.0.0" },
@@ -125,6 +133,57 @@
   const fmt = (value, digits = 3) => Number.isFinite(value) ? Number(value).toFixed(digits).replace(/\.?0+$/, "") : "";
   const nowIso = () => new Date().toISOString();
   const runId = (module) => `${module}_${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}`;
+
+  function loadScriptOnce(key) {
+    const lib = LIBS[key];
+    if (!lib) return Promise.reject(new Error(`Unknown library: ${key}`));
+    if (lib.test()) return Promise.resolve();
+    if (libPromises[key]) return libPromises[key];
+    libPromises[key] = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `${lib.url}?v=${APP_VERSION}`;
+      script.async = true;
+      script.onload = () => lib.test() ? resolve() : reject(new Error(`Loaded ${key}, but the library did not initialize.`));
+      script.onerror = () => reject(new Error(`Could not load ${key} from ${lib.url}`));
+      document.head.appendChild(script);
+    });
+    return libPromises[key];
+  }
+
+  async function ensureAnalysisLibraries() {
+    await Promise.all([loadScriptOnce("xlsx"), loadScriptOnce("papa"), loadScriptOnce("pdf")]);
+  }
+
+  async function ensureZipLibrary() {
+    await loadScriptOnce("zip");
+  }
+
+  async function ensureTiffLibrary() {
+    await loadScriptOnce("tiff");
+  }
+
+  function simpleCsv(rows) {
+    if (!rows.length) return "";
+    const columns = Object.keys(rows[0]);
+    const quote = (value) => {
+      if (value === null || value === undefined || Number.isNaN(value)) return "";
+      const text = String(value);
+      return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    return [columns.join(","), ...rows.map((row) => columns.map((col) => quote(row[col])).join(","))].join("\n");
+  }
+
+  function showFatalError(error) {
+    const message = error && error.message ? error.message : String(error || "Unknown error");
+    const stack = error && error.stack ? error.stack : "";
+    const dashboard = $("dashboard");
+    const workspace = $("workspace");
+    if (dashboard) {
+      dashboard.classList.remove("hidden");
+      dashboard.innerHTML = `<div class="hc-info-card hc-error"><strong>Page script error</strong><div>${esc(message)}</div><pre class="log">${esc(stack)}</pre></div>`;
+    }
+    if (workspace) workspace.classList.add("hidden");
+  }
 
   function loadConfig() {
     try {
@@ -756,7 +815,8 @@
   function csvBytes(rows) {
     if (!rows.length) return new TextEncoder().encode("");
     const columns = Object.keys(rows[0]);
-    const csv = Papa.unparse(rows.map((row) => Object.fromEntries(columns.map((col) => [col, Number.isNaN(row[col]) ? "" : row[col]]))));
+    const cleanRows = rows.map((row) => Object.fromEntries(columns.map((col) => [col, Number.isNaN(row[col]) ? "" : row[col]])));
+    const csv = window.Papa ? Papa.unparse(cleanRows) : simpleCsv(cleanRows);
     return new TextEncoder().encode(csv);
   }
 
@@ -791,6 +851,7 @@
   }
 
   async function svgToPdfBytes(svg) {
+    await loadScriptOnce("pdf");
     const { jsPDF } = window.jspdf;
     const { width, height } = svgSize(svg);
     const pdf = new jsPDF({ orientation: width > height ? "landscape" : "portrait", unit: "pt", format: [width, height] });
@@ -800,6 +861,7 @@
   }
 
   async function svgToTiffBytes(svg, dpi = 600) {
+    await ensureTiffLibrary();
     const scale = Math.max(1, dpi / 150);
     const { canvas } = await svgToPngDataUrl(svg, scale);
     const rgba = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
@@ -819,6 +881,7 @@
   }
 
   async function buildOutputsZip(result) {
+    await ensureZipLibrary();
     const zip = new JSZip();
     const tables = zip.folder("tables");
     const figures = zip.folder("figures");
@@ -1298,6 +1361,7 @@
     const area = $("resultArea");
     area.innerHTML = `<div class="hc-info-card">Running analysis...</div>`;
     try {
+      await ensureAnalysisLibraries();
       const runners = { wellid: runWellId, geco: runGeco, luci: runLuci, lss: runLss, anti: runAnti };
       const result = await runners[state.module]();
       state.lastResult = result;
@@ -1387,6 +1451,7 @@
   }
 
   async function downloadSelectedPlots(result, format) {
+    await ensureZipLibrary();
     const zip = new JSZip();
     const dpi = Number($("wellDpi").value || 600);
     for (const item of selectedWellSvgs(result)) {
@@ -1398,6 +1463,7 @@
   }
 
   async function downloadSelectedData(result) {
+    await ensureZipLibrary();
     const series = selectedWellSeries(result);
     const zip = new JSZip();
     const selected = [...$("wellSelect").selectedOptions].map((opt) => opt.value);
@@ -1456,6 +1522,12 @@
     $("latestRun").textContent = latest ? `Latest run: ${latest.run_id}` : "Latest run: none";
   }
 
-  $("debugMode").addEventListener("change", () => { state.debug = $("debugMode").checked; });
-  renderDashboard();
+  window.addEventListener("error", (event) => showFatalError(event.error || event.message));
+  window.addEventListener("unhandledrejection", (event) => showFatalError(event.reason));
+  try {
+    $("debugMode").addEventListener("change", () => { state.debug = $("debugMode").checked; });
+    renderDashboard();
+  } catch (error) {
+    showFatalError(error);
+  }
 })();
