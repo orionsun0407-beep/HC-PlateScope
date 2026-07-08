@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-08-native2";
+  const APP_VERSION = "2026-07-08-native3";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -123,7 +123,6 @@
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const deepCopy = (value) => JSON.parse(JSON.stringify(value));
   const isFiniteNumber = (value) => Number.isFinite(Number(value));
   const asNum = (value) => {
     if (value === null || value === undefined || value === "") return NaN;
@@ -133,6 +132,10 @@
   const fmt = (value, digits = 3) => Number.isFinite(value) ? Number(value).toFixed(digits).replace(/\.?0+$/, "") : "";
   const nowIso = () => new Date().toISOString();
   const runId = (module) => `${module}_${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}`;
+
+  function deepCopy(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
 
   function loadScriptOnce(key) {
     const lib = LIBS[key];
