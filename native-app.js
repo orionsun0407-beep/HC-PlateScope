@@ -1272,33 +1272,39 @@
     const colorB = opts.colorB || "Secondary color";
     return `
       ${step(2, "Analysis settings", opts.subtitle || "Common controls stay visible; detailed plotting controls live in Advanced settings.")}
-      <div class="panel">
-        <div class="grid three">
+      <div class="panel settings-panel">
+        <div class="settings-group">
           <div><label>Plate format</label><select id="${module}_plate">${manualOnly ? "" : `<option value="auto">Auto-detect</option>`}<option value="96">96-well</option><option value="384">384-well</option></select></div>
           <div><label>Project name for this run</label><input id="${module}_run_name" value="${esc(`${MODULES[module].title.split(" ")[0]} ${new Date().toISOString().slice(0, 10)}`)}"></div>
           <label class="check"><input id="${module}_auto" type="checkbox" checked> Auto-standardize uploaded files with Well ID Extractor</label>
         </div>
-        <div class="grid three">
+        <div class="settings-group">
           <div><label>Scatter plot arrangement</label><select id="${module}_spectra_mode"><option value="plate">Plate layout</option><option value="compact">Compact</option></select></div>
           <div><label>Plots per row</label><input id="${module}_spectra_columns" type="number" min="4" max="24" value="${cfg.plotting.spectra_grid.columns}"></div>
           <div><label>Rows per PDF page</label><input id="${module}_rows_page" type="number" min="2" max="16" value="${cfg.plotting.spectra_grid.rows_per_page}"></div>
         </div>
-        <div class="grid three">
+        <div class="settings-checks">
           <label class="check"><input id="${module}_smooth" type="checkbox" checked> Smoothing enabled</label>
-          <div><label>Marker size</label><input id="${module}_marker" type="range" min="0.5" max="8" step="0.5" value="${cfg.plot.marker_size}"></div>
-          <div><label>Line width</label><input id="${module}_line" type="range" min="0.2" max="3" step="0.1" value="${cfg.plot.line_width}"></div>
           <label class="check"><input id="${module}_perwell" type="checkbox" checked> Per-well y-axis</label>
-          <div><label>Y-axis upper padding</label><input id="${module}_ypad" type="range" min="1" max="1.5" step="0.01" value="${cfg.plotting.y_axis.upper_padding}"></div>
           ${includeHeatmap ? `<label class="check"><input id="${module}_heat_vals" type="checkbox" checked> Show heatmap values</label><label class="check"><input id="${module}_robust" type="checkbox" checked> Robust heatmap scale</label>` : ""}
         </div>
+        <div class="settings-group">
+          <div><label>Marker size</label><input id="${module}_marker" type="range" min="0.5" max="8" step="0.5" value="${cfg.plot.marker_size}"></div>
+          <div><label>Line width</label><input id="${module}_line" type="range" min="0.2" max="3" step="0.1" value="${cfg.plot.line_width}"></div>
+          <div><label>Y-axis upper padding</label><input id="${module}_ypad" type="range" min="1" max="1.5" step="0.01" value="${cfg.plotting.y_axis.upper_padding}"></div>
+        </div>
         <details><summary>Advanced settings</summary>
-          <div class="grid three">
+          <div class="settings-group">
             <div><label>Smoothing method</label><select id="${module}_smooth_method"><option value="savgol">savgol</option></select></div>
             <div><label>Window length</label><input id="${module}_window" type="range" min="3" max="51" step="2" value="${cfg.plot.smoothing.window_length}"></div>
             <div><label>Polynomial order</label><input id="${module}_poly" type="range" min="1" max="5" value="${cfg.plot.smoothing.polyorder}"></div>
+          </div>
+          <div class="settings-group">
             <div><label>Marker alpha</label><input id="${module}_malpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.marker_alpha}"></div>
             <div><label>Line alpha</label><input id="${module}_lalpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.line_alpha}"></div>
             <label class="check"><input id="${module}_nice" type="checkbox" checked> Nice rounding enabled</label>
+          </div>
+          <div class="settings-group">
             <div><label>${esc(colorA)}</label><input id="${module}_primary" type="color" value="${cfg.plotting.colors.primary}"></div>
             <div><label>${esc(colorB)}</label><input id="${module}_secondary" type="color" value="${cfg.plotting.colors.secondary}"></div>
             ${includeHeatmap ? `<div><label>Heatmap colormap</label><select id="${module}_cmap"><option>hc_nature</option><option>hc_soft</option><option>YlGnBu</option><option>BuGn</option><option>viridis</option><option>cividis</option><option>plasma</option></select></div><div><label>Low percentile</label><input id="${module}_robust_low" type="number" min="0" max="20" value="5"></div><div><label>High percentile</label><input id="${module}_robust_high" type="number" min="80" max="100" value="95"></div>` : ""}
