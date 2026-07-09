@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-08-native5";
+  const APP_VERSION = "2026-07-09-native7";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -34,8 +34,8 @@
       dpi: 300,
       font_family: "Arial",
       colors: {
-        primary: "#0F4D92",
-        secondary: "#8BCF8B",
+        primary: "#4C78A8",
+        secondary: "#59A14F",
         accent: "#B64342",
         heatmap: "hc_nature",
       },
@@ -190,10 +190,19 @@
 
   function loadConfig() {
     try {
-      return mergeDeep(deepCopy(DEFAULT_CONFIG), JSON.parse(localStorage.getItem(CONFIG_KEY) || "{}"));
+      return normalizeLoadedConfig(mergeDeep(deepCopy(DEFAULT_CONFIG), JSON.parse(localStorage.getItem(CONFIG_KEY) || "{}")));
     } catch {
       return deepCopy(DEFAULT_CONFIG);
     }
+  }
+
+  function normalizeLoadedConfig(config) {
+    const colors = config?.plotting?.colors;
+    if (colors?.primary === "#0F4D92" && colors?.secondary === "#8BCF8B") {
+      colors.primary = "#4C78A8";
+      colors.secondary = "#59A14F";
+    }
+    return config;
   }
 
   function saveConfig() {
@@ -670,56 +679,104 @@
     return `<${tag}${attr}>${body}</${tag}>`;
   }
 
-  function seriesRange(table, wells) {
+  function seriesRange(table, wells, config = DEFAULT_CONFIG, normalized = false) {
     const xs = table.rows.map((r) => asNum(r.Wavelength)).filter(Number.isFinite);
     const ys = [];
     for (const row of table.rows) for (const well of wells) {
       const value = asNum(row[well]);
       if (Number.isFinite(value)) ys.push(value);
     }
-    return { xmin: Math.min(...xs), xmax: Math.max(...xs), ymin: Math.min(0, ...ys), ymax: niceUpperLimit(Math.max(...ys) * 1.1) };
+    const yCfg = config.plotting?.y_axis || {};
+    const padding = Number(yCfg.upper_padding || 1.1);
+    const rawMax = Math.max(...ys);
+    const padded = Number.isFinite(rawMax) && rawMax > 0 ? rawMax * padding : padding;
+    const ymax = normalized ? Math.max(padding, padded) : yCfg.rounding_mode === "raw" ? padded : niceUpperLimit(padded);
+    return {
+      xmin: Math.min(...xs),
+      xmax: Math.max(...xs),
+      ymin: Math.min(0, ...ys),
+      ymax: Number.isFinite(ymax) && ymax > 0 ? ymax : 1,
+    };
   }
 
-  function wellPanelSvg({ tables, labels, colors, well, title, x, y, width, height, smooth = true, windowLength = 9, badge }) {
-    const pad = { l: 28, r: 8, t: 20, b: 26 };
+  function wavelengthTicks(values, interval = 10) {
+    const xs = values.map(asNum).filter(Number.isFinite);
+    if (!xs.length) return [];
+    const step = Math.max(1, Number(interval) || 10);
+    const low = Math.floor(Math.min(...xs) / step) * step;
+    const high = Math.ceil(Math.max(...xs) / step) * step;
+    const ticks = [];
+    for (let tick = low; tick <= high + 1e-9; tick += step) ticks.push(tick);
+    return ticks;
+  }
+
+  function wellPanelSvg({ tables, labels, colors, well, title, x, y, width, height, smooth = true, windowLength = 9, badge, config = DEFAULT_CONFIG, normalized = false, moduleKey = "" }) {
+    const pad = { l: 32, r: 10, t: 18, b: 36 };
     const innerW = width - pad.l - pad.r;
     const innerH = height - pad.t - pad.b;
-    const range = seriesRange(tables[0], [well]);
+    const range = seriesRange(tables[0], [well], config, normalized);
     for (const table of tables.slice(1)) {
-      const r = seriesRange(table, [well]);
+      const r = seriesRange(table, [well], config, normalized);
       range.ymax = Math.max(range.ymax, r.ymax);
+    }
+    const allX = tables.flatMap((table) => table.rows.map((row) => row.Wavelength));
+    const tickInterval = config.plotting?.x_axis?.tick_interval_nm || 10;
+    const ticks = wavelengthTicks(allX, tickInterval);
+    if (ticks.length) {
+      range.xmin = ticks[0];
+      range.xmax = ticks[ticks.length - 1];
     }
     const sx = (v) => x + pad.l + ((v - range.xmin) / Math.max(1e-9, range.xmax - range.xmin)) * innerW;
     const sy = (v) => y + pad.t + innerH - ((v - range.ymin) / Math.max(1e-9, range.ymax - range.ymin)) * innerH;
+    const markerRadius = Math.max(0.75, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.7);
+    const lineWidth = Math.max(0.6, Number(config.plot?.line_width || config.plotting?.line_width || 1));
+    const markerAlpha = Number(config.plot?.marker_alpha || config.plotting?.alpha || 0.55);
+    const lineAlpha = Number(config.plot?.line_alpha || config.plotting?.line_alpha || 0.95);
     const grid = [];
+    const yTicks = [0, range.ymax / 2, range.ymax];
+    for (const tick of ticks) {
+      const gx = sx(tick);
+      grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": 0.45 }));
+      grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + 3, stroke: "#333", "stroke-width": 0.45 }));
+      grid.push(svgEl("text", { x: gx + 1, y: y + height - 6, "font-size": 5.2, fill: "#444", transform: `rotate(-90 ${gx + 1} ${y + height - 6})` }, fmt(tick, 0)));
+    }
+    for (const tick of yTicks) {
+      const gy = sy(tick);
+      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#EAEAEA", "stroke-width": 0.45 }));
+      grid.push(svgEl("line", { x1: x + pad.l - 3, y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": 0.45 }));
+      grid.push(svgEl("text", { x: x + pad.l - 5, y: gy + 2, "text-anchor": "end", "font-size": 5.5, fill: "#444" }, fmt(tick, tick >= 10 ? 0 : 1)));
+    }
+    if (!ticks.length) {
+      for (let i = 0; i <= 4; i += 1) {
+        const gx = x + pad.l + innerW * i / 4;
+        grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": 0.45 }));
+      }
+    }
     for (let i = 0; i <= 4; i += 1) {
-      const gx = x + pad.l + innerW * i / 4;
       const gy = y + pad.t + innerH * i / 4;
-      grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#E6ECE8", "stroke-width": 0.6 }));
-      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#E6ECE8", "stroke-width": 0.6 }));
+      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#F2F2F2", "stroke-width": 0.35 }));
     }
     const plots = [];
     tables.forEach((table, idx) => {
       const pts = table.rows.map((row) => [asNum(row.Wavelength), asNum(row[well])]).filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
-      plots.push(...pts.map(([px, py]) => svgEl("circle", { cx: sx(px), cy: sy(py), r: 0.9, fill: colors[idx], opacity: 0.45 })));
+      plots.push(...pts.map(([px, py]) => svgEl("circle", { cx: sx(px), cy: sy(py), r: markerRadius.toFixed(2), fill: colors[idx], opacity: markerAlpha })));
       const yValues = smooth ? savgolLike(pts.map((p) => p[1]), windowLength) : pts.map((p) => p[1]);
       const d = pts.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(2)} ${sy(yValues[i]).toFixed(2)}`).join(" ");
-      plots.push(svgEl("path", { d, fill: "none", stroke: colors[idx], "stroke-width": 1.15, opacity: 0.95 }));
+      plots.push(svgEl("path", { d, fill: "none", stroke: colors[idx], "stroke-width": lineWidth.toFixed(2), opacity: lineAlpha }));
     });
-    const badgeSvg = badge ? svgEl("rect", { x: x + width - 42, y: y + 18, width: 34, height: 13, rx: 2, fill: badge.color || "#42949E", opacity: 0.92 }) +
-      svgEl("text", { x: x + width - 25, y: y + 28, "text-anchor": "middle", "font-size": 7, "font-weight": "700", fill: "white" }, badge.text) : "";
+    const badgeSvg = badge ? svgEl("rect", { x: x + width - 48, y: y + 18, width: 40, height: 14, rx: 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
+      svgEl("text", { x: x + width - 28, y: y + 28.5, "text-anchor": "middle", "font-size": 7.2, "font-weight": "700", fill: "white" }, badge.text) : "";
+    const titleAttrs = moduleKey === "geco"
+      ? { x: x + width - 8, y: y + 12, "text-anchor": "end" }
+      : { x: x + 8, y: y + 12, "text-anchor": "start" };
     return svgEl("g", {}, [
       svgEl("rect", { x, y, width, height, fill: "white" }),
       ...grid,
       svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": 0.75 }),
       svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": 0.75 }),
       ...plots,
-      svgEl("text", { x: x + width - 8, y: y + 12, "text-anchor": "end", "font-size": 8, "font-weight": "700", fill: "#333" }, title || well),
+      svgEl("text", { ...titleAttrs, "font-size": 8, "font-weight": "700", fill: "#333" }, title || well),
       badgeSvg,
-      svgEl("text", { x: x + pad.l, y: y + height - 8, "font-size": 6, fill: "#444" }, fmt(range.xmin, 0)),
-      svgEl("text", { x: x + width - pad.r, y: y + height - 8, "text-anchor": "end", "font-size": 6, fill: "#444" }, fmt(range.xmax, 0)),
-      svgEl("text", { x: x + 4, y: y + pad.t + innerH, "font-size": 6, fill: "#444" }, "0"),
-      svgEl("text", { x: x + 4, y: y + pad.t + 5, "font-size": 6, fill: "#444" }, fmt(range.ymax, 0)),
     ].join(""));
   }
 
@@ -727,12 +784,12 @@
     const layout = config.plotting.spectra_grid || {};
     const ncols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plateLayout(config, wells).cols.length;
     const pageWells = wells.slice();
-    const panelW = 92;
-    const panelH = 76;
-    const gap = 10;
+    const panelW = 128;
+    const panelH = 100;
+    const gap = 14;
     const rows = Math.ceil(pageWells.length / ncols);
     const width = 42 + ncols * panelW + (ncols - 1) * gap;
-    const height = 60 + rows * panelH + (rows - 1) * gap;
+    const height = 74 + rows * panelH + (rows - 1) * gap;
     const colors = [config.plotting.colors.primary, config.plotting.colors.secondary];
     const panels = pageWells.map((well, idx) => {
       const col = idx % ncols;
@@ -744,19 +801,22 @@
         well,
         title: well,
         x: 22 + col * (panelW + gap),
-        y: 42 + row * (panelH + gap),
+        y: 48 + row * (panelH + gap),
         width: panelW,
         height: panelH,
         smooth: config.plot.smoothing.enabled,
         windowLength: config.plot.smoothing.window_length,
         badge: (highlights[well] || [])[0],
+        config,
+        normalized,
+        moduleKey,
       });
     }).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
       <text x="${width / 2}" y="24" text-anchor="middle" font-size="18" font-weight="700" fill="#111">${esc(title)}</text>
       ${panels}
-      <text x="${width / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="#444">Wavelength (nm)</text>
+      <text x="${width / 2}" y="${height - 10}" text-anchor="middle" font-size="10" fill="#444">Wavelength (nm)</text>
     </svg>`;
   }
 
@@ -795,21 +855,18 @@
   function combineReportSvg(title, grid, heatmap) {
     const gridBox = svgSize(grid);
     const heatBox = svgSize(heatmap);
-    const width = 794;
-    const height = 1123;
-    const gridMaxW = 734;
-    const gridMaxH = 650;
-    const heatMaxW = 680;
-    const heatMaxH = 360;
-    const gridScale = Math.min(gridMaxW / gridBox.width, gridMaxH / gridBox.height);
-    const heatScale = Math.min(heatMaxW / heatBox.width, heatMaxH / heatBox.height);
-    const gridX = (width - gridBox.width * gridScale) / 2;
-    const heatX = (width - heatBox.width * heatScale) / 2;
+    const margin = 36;
+    const gap = 54;
+    const width = Math.max(900, gridBox.width + margin * 2, heatBox.width + margin * 2);
+    const height = 72 + gridBox.height + gap + heatBox.height + 42;
+    const gridX = (width - gridBox.width) / 2;
+    const heatX = (width - heatBox.width) / 2;
+    const heatY = 72 + gridBox.height + gap;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
       <text x="${width / 2}" y="30" text-anchor="middle" font-size="22" font-weight="700" fill="#111">${esc(title)}</text>
-      <g transform="translate(${gridX.toFixed(2)} 58) scale(${gridScale.toFixed(4)})">${stripSvg(grid)}</g>
-      <g transform="translate(${heatX.toFixed(2)} 742) scale(${heatScale.toFixed(4)})">${stripSvg(heatmap)}</g>
+      <g transform="translate(${gridX.toFixed(2)} 58)">${stripSvg(grid)}</g>
+      <g transform="translate(${heatX.toFixed(2)} ${heatY.toFixed(2)})">${stripSvg(heatmap)}</g>
     </svg>`;
   }
 
@@ -937,6 +994,28 @@
     zip.file("config_snapshot.yaml", configToYaml(result.config));
     zip.file("processing_log.txt", result.log.join("\n"));
     return zip.generateAsync({ type: "blob" });
+  }
+
+  function resultDownloadFiles(result) {
+    return [
+      ...result.files,
+      { path: "run_metadata.json", bytes: JSON.stringify(result.metadata, null, 2) },
+      { path: "config_snapshot.yaml", bytes: configToYaml(result.config) },
+      { path: "processing_log.txt", bytes: result.log.join("\n") },
+    ];
+  }
+
+  function mimeForPath(path) {
+    const ext = path.split(".").pop().toLowerCase();
+    if (ext === "pdf") return "application/pdf";
+    if (ext === "csv") return "text/csv";
+    if (ext === "xlsx") return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    if (ext === "json") return "application/json";
+    if (ext === "yaml" || ext === "yml") return "text/yaml";
+    if (ext === "txt") return "text/plain";
+    if (ext === "svg") return "image/svg+xml";
+    if (ext === "tif" || ext === "tiff") return "image/tiff";
+    return "application/octet-stream";
   }
 
   async function addFigureFiles(files, basePath, svg) {
@@ -1455,6 +1534,7 @@
   function renderResult(result) {
     const area = $("resultArea");
     const report = result.files.find((file) => file.path.includes("combined_report") && file.previewSvg);
+    const downloads = resultDownloadFiles(result);
     const summaryName = result.module === "wellid" ? "Preview table" : result.module === "geco" ? "Peak ratio preview" : result.module === "luci" ? "Peak summary preview" : result.module === "lss" ? "LSS summary preview" : "Normalization summary preview";
     area.innerHTML = `
       ${step(4, "Results & downloads", "Inspect summary, warnings, previews, and browser output files.")}
@@ -1463,13 +1543,19 @@
         ${kpis(result)}
         ${result.warnings.length ? `<div class="hc-info-card hc-warning"><strong>Warnings</strong>${result.warnings.map((w) => `<div>${esc(w)}</div>`).join("")}</div>` : ""}
         <div class="actions"><button class="primary" id="downloadZip" type="button">Download outputs.zip</button></div>
-        <ul class="file-list">${result.metadata.output_files.map((file) => `<li><span>${esc(file)}</span></li>`).join("")}</ul>
+        <div class="download-grid">${downloads.map((file, idx) => `<button class="download-file" type="button" data-download-index="${idx}"><span>Download</span><strong>${esc(file.path.split("/").pop())}</strong><small>${esc(file.path)}</small></button>`).join("")}</div>
       </div>
       <div class="panel"><h2>${esc(summaryName)}</h2>${tableHtml(result.summary.slice(0, 100))}</div>
       ${report ? `<div class="panel"><h2>Report preview</h2><div class="hc-pdf-preview">${report.previewSvg}</div></div>` : ""}
       ${selectedWellPanel(result)}
     `;
     $("downloadZip").addEventListener("click", async () => downloadBlob(await buildOutputsZip(result), `${result.id}_outputs.zip`, "application/zip"));
+    area.querySelectorAll("[data-download-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const file = downloads[Number(btn.dataset.downloadIndex)];
+        downloadBlob(file.bytes, file.path.split("/").pop(), mimeForPath(file.path));
+      });
+    });
     wireSelectedWellPanel(result);
   }
 
@@ -1524,7 +1610,7 @@
     const smooth = getChecked("wellSmooth");
     const windowLength = Number($("wellWindow").value || 11);
     return selected.map((well) => {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="620" height="430" viewBox="0 0 620 430"><rect width="100%" height="100%" fill="white"/><text x="310" y="30" text-anchor="middle" font-size="20" font-weight="700">${esc(MODULES[result.module].title)} ${esc(well)}</text>${wellPanelSvg({ tables: series.tables, labels: series.labels, colors: [result.config.plotting.colors.primary, result.config.plotting.colors.secondary], well, title: well, x: 40, y: 54, width: 540, height: 330, smooth, windowLength })}</svg>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="760" height="520" viewBox="0 0 760 520"><rect width="100%" height="100%" fill="white"/><text x="380" y="32" text-anchor="middle" font-size="20" font-weight="700">${esc(MODULES[result.module].title)} ${esc(well)}</text>${wellPanelSvg({ tables: series.tables, labels: series.labels, colors: [result.config.plotting.colors.primary, result.config.plotting.colors.secondary], well, title: well, x: 52, y: 60, width: 656, height: 390, smooth, windowLength, config: result.config, moduleKey: result.module, normalized: ["luci", "anti"].includes(result.module) })}<text x="380" y="500" text-anchor="middle" font-size="11" fill="#444">Wavelength (nm)</text></svg>`;
       return { well, svg };
     });
   }
