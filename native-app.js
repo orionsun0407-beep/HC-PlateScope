@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-streamlit-clone";
+  const APP_VERSION = "2026-07-27-streamlit-parity-audit";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -16,7 +16,7 @@
   const libPromises = {};
 
   const DEFAULT_CONFIG = {
-    project: { name: "HC PlateScope", version: "2.0.0" },
+    project: { name: "HC PlateScope", version: "1.0.0" },
     input: {
       wavelength_keywords: ["wavelength", "wave", "lambda", "nm", "wl", "波长"],
       scan_all_columns_for_wells: true,
@@ -34,8 +34,8 @@
       dpi: 300,
       font_family: "Arial",
       colors: {
-        primary: "#4C78A8",
-        secondary: "#59A14F",
+        primary: "#0F4D92",
+        secondary: "#8BCF8B",
         accent: "#B64342",
         heatmap: "hc_nature",
       },
@@ -203,11 +203,6 @@
   }
 
   function normalizeLoadedConfig(config) {
-    const colors = config?.plotting?.colors;
-    if (colors?.primary === "#0F4D92" && colors?.secondary === "#8BCF8B") {
-      colors.primary = "#4C78A8";
-      colors.secondary = "#59A14F";
-    }
     return config;
   }
 
@@ -938,6 +933,46 @@
     return JSON.stringify(String(value));
   }
 
+  function parseSimpleYaml(text) {
+    const root = {};
+    const stack = [{ indent: -1, value: root, key: null }];
+    const lines = String(text).split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith("#"));
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      const line = lines[lineIndex];
+      const indent = line.match(/^\s*/)[0].length;
+      const trimmed = line.trim();
+      while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop();
+      const parent = stack[stack.length - 1].value;
+      if (trimmed.startsWith("- ")) {
+        if (!Array.isArray(parent)) continue;
+        parent.push(parseYamlScalar(trimmed.slice(2)));
+        continue;
+      }
+      const idx = trimmed.indexOf(":");
+      if (idx < 0) continue;
+      const key = trimmed.slice(0, idx).trim();
+      const rest = trimmed.slice(idx + 1).trim();
+      if (rest) {
+        parent[key] = parseYamlScalar(rest);
+      } else {
+        const nextLine = lines[lineIndex + 1] || "";
+        const nextTrimmed = nextLine.trim();
+        parent[key] = nextTrimmed.startsWith("- ") ? [] : {};
+        stack.push({ indent, value: parent[key], key });
+      }
+    }
+    return root;
+  }
+
+  function parseYamlScalar(value) {
+    const text = String(value).trim();
+    if (text === "null") return null;
+    if (text === "true") return true;
+    if (text === "false") return false;
+    if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+    try { return JSON.parse(text); } catch { return text.replace(/^["']|["']$/g, ""); }
+  }
+
   async function svgToPngDataUrl(svg, scale = 2) {
     const { width, height } = svgSize(svg);
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
@@ -1278,6 +1313,7 @@
       module_type: result.metadata.module_type,
       input_files: (result.metadata.input_files || []).join(", "),
       warnings: result.warnings.length,
+      wells: result.metadata.common_well_count || result.wells?.length || result.metadata.recognition?.well_count || "n/a",
       output_files: result.metadata.output_files,
       summary: result.summary.slice(0, 20),
     };
@@ -1306,7 +1342,7 @@
       <div class="feature-grid dashboard-row">${["wellid", "geco", "luci"].map(featureCard).join("")}</div>
       <div class="feature-grid dashboard-row">${["lss", "anti"].map(featureCard).join("")}
         <div class="feature-slot">
-          <div class="hc-feature-card hc-accent-teal"><div class="hc-accent-line"></div><h3>Analysis History</h3><p>Browse runs, metadata, reports, and restored settings.</p><div class="hc-tags"><span class="hc-tag">outputs/</span><span class="hc-tag">metadata</span><span class="hc-tag">settings</span></div></div>
+          <div class="hc-feature-card hc-accent-teal"><div class="hc-accent-line"></div><h3>Analysis History</h3><p>Browse local runs, metadata, reports, and restored settings.</p><div class="hc-tags"><span class="hc-tag">outputs/</span><span class="hc-tag">metadata</span><span class="hc-tag">settings</span></div></div>
           <button class="card-button" data-page="history">Open history</button>
           <button class="card-button" data-page="settings">Settings</button>
         </div>
@@ -1368,25 +1404,39 @@
     return `<div><label for="${id}">${esc(label)}</label><input id="${id}" type="file" accept=".xlsx,.xls,.csv"><div class="field-note" id="${id}_note"></div></div>`;
   }
 
-  function commonControls(module, opts = {}) {
+  function plateControls(module, opts = {}) {
     const cfg = state.config;
     const manualOnly = opts.manualOnly;
+    return `<div class="settings-group">
+      <div><label>Plate format</label><select id="${module}_plate">${manualOnly ? "" : `<option value="auto">Auto-detect</option>`}<option value="96">96-well</option><option value="384">384-well</option></select></div>
+      <div><label>Scatter plot arrangement</label><select id="${module}_spectra_mode"><option value="plate">Plate layout</option><option value="compact">Compact</option></select></div>
+      <div><label>Plots per row</label><input id="${module}_spectra_columns" type="number" min="4" max="24" value="${cfg.plotting.spectra_grid.columns}"></div>
+      <div><label>Rows per PDF page</label><input id="${module}_rows_page" type="number" min="2" max="16" value="${cfg.plotting.spectra_grid.rows_per_page}"></div>
+    </div>`;
+  }
+
+  function standardizationOption(module) {
+    return `<label class="check standalone-check"><input id="${module}_auto" type="checkbox" checked> Auto-standardize uploaded files with Well ID Extractor</label>
+      <div class="hc-info-card"><strong>Built-in Well ID Extractor</strong><div>Uploaded files are converted to Wavelength + well ID columns before analysis.</div><div>Plate format can be auto-detected or manually set to 96-well / 384-well.</div><div>This changes file preparation only; analysis formulas remain unchanged.</div></div>`;
+  }
+
+  function runNameControl(module) {
+    const prefix = module === "wellid" ? "Well ID" : MODULES[module].title.split(" ")[0];
+    return `<div><label>Project name for this run</label><input id="${module}_run_name" value="${esc(`${prefix} ${new Date().toISOString().slice(0, 10)}`)}"></div>`;
+  }
+
+  function commonControls(module, opts = {}) {
+    const cfg = state.config;
     const includeHeatmap = opts.heatmap;
     const colorA = opts.colorA || "Primary color";
     const colorB = opts.colorB || "Secondary color";
     return `
       ${step(2, "Analysis settings", opts.subtitle || "Common controls stay visible; detailed plotting controls live in Advanced settings.")}
       <div class="panel settings-panel">
-        <div class="settings-group">
-          <div><label>Plate format</label><select id="${module}_plate">${manualOnly ? "" : `<option value="auto">Auto-detect</option>`}<option value="96">96-well</option><option value="384">384-well</option></select></div>
-          <div><label>Project name for this run</label><input id="${module}_run_name" value="${esc(`${MODULES[module].title.split(" ")[0]} ${new Date().toISOString().slice(0, 10)}`)}"></div>
-          <label class="check"><input id="${module}_auto" type="checkbox" checked> Auto-standardize uploaded files with Well ID Extractor</label>
-        </div>
-        <div class="settings-group">
-          <div><label>Scatter plot arrangement</label><select id="${module}_spectra_mode"><option value="plate">Plate layout</option><option value="compact">Compact</option></select></div>
-          <div><label>Plots per row</label><input id="${module}_spectra_columns" type="number" min="4" max="24" value="${cfg.plotting.spectra_grid.columns}"></div>
-          <div><label>Rows per PDF page</label><input id="${module}_rows_page" type="number" min="2" max="16" value="${cfg.plotting.spectra_grid.rows_per_page}"></div>
-        </div>
+        ${opts.includePlate === false ? "" : plateControls(module, { manualOnly: opts.manualOnly })}
+        ${opts.fixedNormalize ? `<label class="check standalone-check"><input type="checkbox" checked disabled> ${esc(opts.fixedNormalize)}</label>` : ""}
+        ${opts.fixedRaw ? `<label class="check standalone-check"><input type="checkbox" disabled> ${esc(opts.fixedRaw)}</label>` : ""}
+        ${opts.beforePlot || ""}
         <div class="settings-checks">
           <label class="check"><input id="${module}_smooth" type="checkbox" disabled> Raw point-to-point lines</label>
           <label class="check"><input id="${module}_perwell" type="checkbox" checked> Per-well y-axis</label>
@@ -1414,11 +1464,11 @@
             ${includeHeatmap ? `<div><label>Heatmap colormap</label><select id="${module}_cmap"><option>hc_nature</option><option>hc_soft</option><option>YlGnBu</option><option>BuGn</option><option>viridis</option><option>cividis</option><option>plasma</option></select></div><div><label>Low percentile</label><input id="${module}_robust_low" type="number" min="0" max="20" value="5"></div><div><label>High percentile</label><input id="${module}_robust_high" type="number" min="80" max="100" value="95"></div>` : ""}
           </div>
         </details>
+        <div class="settings-group single">${runNameControl(module)}</div>
       </div>`;
   }
 
   function wellIdControls() {
-    const today = new Date().toISOString().slice(0, 10);
     return `
       ${step(2, "Detection settings", "The extractor recognizes common wavelength columns and 96/384-well IDs.")}
       <div class="panel">
@@ -1430,7 +1480,7 @@
         </div>
         <div class="grid two">
           <div><label>Output file format</label><select disabled><option>xlsx</option></select></div>
-          <div><label>Project name for this run</label><input id="wellid_run_name" value="Well ID ${today}"></div>
+          ${runNameControl("wellid")}
         </div>
       </div>`;
   }
@@ -1440,48 +1490,52 @@
       return `${step(1, "Upload raw file", "Supported formats: .xlsx, .xls, .csv.")}
         <div class="panel">${fileField("wellid_upload", "Upload Excel or CSV file")}</div>
         ${wellIdControls()}
-        ${runStep("Run Well ID Extraction")}`;
+        ${runStep("Run Well ID Extraction", "Upload one raw Excel or CSV file before running.")}`;
     }
     if (module === "geco") {
       return `${step(1, "Upload files", "Choose 96-well two-file GECO or 384-well single-file adjacent-pair GECO.")}
-        <div class="panel" id="gecoFiles"></div>
-        ${commonControls("geco", { manualOnly: true, heatmap: true, colorA: "Color with CA", colorB: "Color without CA" })}
-        ${runStep("Run GECO Analysis")}`;
+        <div class="panel settings-panel">${plateControls("geco", { manualOnly: true })}<div id="gecoFiles"></div>${standardizationOption("geco")}</div>
+        ${commonControls("geco", { includePlate: false, heatmap: true, colorA: "Color with CA", colorB: "Color without CA" })}
+        ${runStep("Run GECO Analysis", "Upload both with-CA and without-CA tables before running.")}`;
     }
     if (module === "luci") {
       return `${step(1, "Upload file", "Upload a raw reader export or a standardized LUCI well-by-column table.")}
-        <div class="panel">${fileField("luci_upload", "Upload LUCI table")}</div>
-        ${commonControls("luci", { heatmap: true, subtitle: "Peak windows are shown here because they affect the LUCI ratio." })}
-        <div class="panel grid two"><div><label>450 nm peak window</label><input id="luci_450" value="430,470"></div><div><label>520 nm peak window</label><input id="luci_520" value="500,540"></div></div>
-        ${runStep("Run LUCI Analysis")}`;
+        <div class="panel">${fileField("luci_upload", "Upload LUCI table")}${standardizationOption("luci")}</div>
+        ${commonControls("luci", { heatmap: true, subtitle: "Peak windows are shown here because they affect the LUCI ratio.", fixedNormalize: "Normalize by column maximum", beforePlot: `<div class="grid two"><div><label>450 nm peak window</label><input id="luci_450" value="430,470"></div><div><label>520 nm peak window</label><input id="luci_520" value="500,540"></div></div>` })}
+        ${runStep("Run LUCI Analysis", "Upload one LUCI table before running.")}`;
     }
     if (module === "lss") {
       return `${step(1, "Upload files", "Upload Excitation and Emission tables. LSS always uses raw signal values.")}
-        <div class="panel grid two">${fileField("lss_excitation", "Upload Excitation table")}${fileField("lss_emission", "Upload Emission table")}</div>
-        ${commonControls("lss", { heatmap: true, colorA: "Emission color", colorB: "Excitation color" })}
-        ${runStep("Run LSS Analysis")}`;
+        <div class="panel grid two">${fileField("lss_excitation", "Upload Excitation table")}${fileField("lss_emission", "Upload Emission table")}<div class="full">${standardizationOption("lss")}</div></div>
+        ${commonControls("lss", { heatmap: true, colorA: "Emission color", colorB: "Excitation color", fixedRaw: "Normalize data" })}
+        ${runStep("Run LSS Analysis", "Upload both Excitation and Emission tables before running.")}`;
     }
     return `${step(1, "Upload files", "Upload Excitation and Emission tables. Each signal is normalized separately.")}
-      <div class="panel grid two">${fileField("anti_excitation", "Upload Excitation table")}${fileField("anti_emission", "Upload Emission table")}</div>
-      ${commonControls("anti", { heatmap: false, colorA: "Excitation color", colorB: "Emission color" })}
-      ${runStep("Run ANTI Analysis")}`;
+      <div class="panel grid two">${fileField("anti_excitation", "Upload Excitation table")}${fileField("anti_emission", "Upload Emission table")}<div class="full">${standardizationOption("anti")}</div></div>
+      ${commonControls("anti", { heatmap: false, colorA: "Excitation color", colorB: "Emission color", fixedNormalize: "Normalize by column maximum" })}
+      ${runStep("Run ANTI Analysis", "Upload both Excitation and Emission tables before running.")}`;
   }
 
-  function runStep(label) {
-    return `${step(3, "Run analysis")}<div class="panel"><div class="hc-info-card">Analysis runs locally in your browser. Download outputs.zip to keep a permanent run folder.</div><button class="primary" type="submit">${esc(label)}</button></div>`;
+  function runStep(label, helpText) {
+    return `${step(3, "Run analysis")}<div class="panel"><button class="primary" id="runSubmitButton" type="submit" disabled>${esc(label)}</button><div class="hc-info-card hc-warning" id="readyCheck"><strong>Ready check</strong><div>${esc(helpText)}</div></div></div>`;
   }
 
   function wireModuleControls(module) {
     const plate = $(`${module}_plate`);
     if (plate) {
       plate.value = module === "geco" ? "96" : String(plateFormatFromConfig(state.config));
-      plate.addEventListener("change", () => module === "geco" && renderGecoFiles());
+      plate.addEventListener("change", () => {
+        if (module === "geco") renderGecoFiles();
+        updateReadyState(module);
+      });
     }
     if (module === "geco") renderGecoFiles();
     document.querySelectorAll("input[type=file]").forEach((input) => input.addEventListener("change", () => {
       const note = $(`${input.id}_note`);
       if (note && input.files[0]) note.innerHTML = `<span class="hc-file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span><span>${esc(input.files[0].name.split(".").pop().toUpperCase())}</span></span>`;
+      updateReadyState(module);
     }));
+    updateReadyState(module);
   }
 
   function renderGecoFiles() {
@@ -1492,7 +1546,24 @@
     $("gecoFiles").querySelectorAll("input[type=file]").forEach((input) => input.addEventListener("change", () => {
       const note = $(`${input.id}_note`);
       if (note && input.files[0]) note.innerHTML = `<span class="hc-file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span><span>${esc(input.files[0].name.split(".").pop().toUpperCase())}</span></span>`;
+      updateReadyState("geco");
     }));
+  }
+
+  function updateReadyState(module) {
+    const button = $("runSubmitButton");
+    if (!button) return;
+    const is384 = $("geco_plate")?.value === "384";
+    const ready = module === "wellid" ? Boolean(fileInput("wellid_upload"))
+      : module === "geco" ? (is384 ? Boolean(fileInput("geco_paired")) : Boolean(fileInput("geco_with") && fileInput("geco_without")))
+      : module === "luci" ? Boolean(fileInput("luci_upload"))
+      : module === "lss" ? Boolean(fileInput("lss_excitation") && fileInput("lss_emission"))
+      : Boolean(fileInput("anti_excitation") && fileInput("anti_emission"));
+    button.disabled = !ready;
+    if ($("readyCheck")) {
+      $("readyCheck").classList.toggle("hidden", ready);
+      if (module === "geco") $("readyCheck").innerHTML = `<strong>Ready check</strong><div>${is384 ? "Upload one 384-well paired table before running." : "Upload both with-CA and without-CA tables before running."}</div>`;
+    }
   }
 
   function formConfig(module) {
@@ -1680,8 +1751,27 @@
     $("dashboard").classList.add("hidden");
     $("workspace").classList.remove("hidden");
     $("currentWorkspace").textContent = "Current workspace: Analysis History";
-    $("workspace").innerHTML = `<button data-back>Back to Dashboard</button><div class="hc-breadcrumb">Dashboard / Analysis History</div><div class="hc-module-header"><div><h1>Analysis History</h1><p>Browse previous analysis runs stored locally in this browser.</p><div class="hc-tags"><span class="hc-tag">Local records</span><span class="hc-tag">Metadata</span><span class="hc-tag">Reproducibility</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>outputs/run_index.csv</strong></div></div>${section("Runs", `${state.history.length} record(s) shown.`)}${state.history.length ? tableHtml(state.history) : `<div class="hc-info-card">No history found.</div>`}`;
+    const modules = [...new Set(state.history.map((row) => row.module_type).filter(Boolean))].sort();
+    $("workspace").innerHTML = `<button data-back>Back to Dashboard</button><div class="hc-breadcrumb">Dashboard / Analysis History</div><div class="hc-module-header"><div><h1>Analysis History</h1><p>Browse previous analysis runs stored in the local outputs folder.</p><div class="hc-tags"><span class="hc-tag">Local records</span><span class="hc-tag">Metadata</span><span class="hc-tag">Reproducibility</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>outputs/run_index.csv</strong></div></div>
+      ${state.history.length ? `${section("Filters")}<div class="panel grid three"><div><label>Module type</label><select id="histModule"><option>All</option>${modules.map((m) => `<option>${esc(String(m).toLowerCase() === "anti" ? "ANTI" : m)}</option>`).join("")}</select></div><div><label>Sort by time</label><select id="histSort"><option>Newest first</option><option>Oldest first</option></select></div><div><label>Search project name, run_id, or input file name</label><input id="histSearch"></div></div><div id="historyRuns"></div>` : `<div class="hc-info-card"><strong>No history found</strong><div>outputs/run_index.csv does not exist yet.</div></div>`}`;
     $("workspace").querySelector("[data-back]").addEventListener("click", renderDashboard);
+    if ($("historyRuns")) {
+      const renderRuns = () => {
+        const moduleFilter = $("histModule").value;
+        const search = $("histSearch").value.trim().toLowerCase();
+        const asc = $("histSort").value === "Oldest first";
+        let rows = [...state.history];
+        if (moduleFilter !== "All") rows = rows.filter((row) => String(row.module_type).toLowerCase() === moduleFilter.toLowerCase());
+        if (search) rows = rows.filter((row) => [row.run_id, row.run_name, row.input_files].some((v) => String(v || "").toLowerCase().includes(search)));
+        rows.sort((a, b) => asc ? String(a.timestamp).localeCompare(String(b.timestamp)) : String(b.timestamp).localeCompare(String(a.timestamp)));
+        $("historyRuns").innerHTML = `${section("Runs", `${rows.length} record(s) shown.`)}${rows.map((row, idx) => `<div class="hc-history-card"><div><span class="hc-tag">${esc(row.module_type || "Run")}</span><h3>${esc(row.run_id || "")}</h3><p>${esc(row.timestamp || "")}</p></div><div><p><strong>Inputs</strong><br>${esc(row.input_files || "")}</p><p><strong>Wells</strong> ${esc(row.wells || "n/a")} · <strong>Status</strong> complete · <strong>Warnings</strong> ${esc(row.warnings || 0)}</p></div></div><div class="grid four history-actions"><button disabled>Open report</button><button type="button" data-folder="${idx}">Open folder</button><button type="button" data-meta="${idx}">View metadata</button><button type="button" data-restore="${idx}">Restore settings</button></div><div id="histExtra${idx}"></div>`).join("")}`;
+        $("historyRuns").querySelectorAll("[data-folder]").forEach((btn) => btn.addEventListener("click", () => { $(`histExtra${btn.dataset.folder}`).innerHTML = `<div class="hc-file-pill">Run folder <code>${esc(state.history[Number(btn.dataset.folder)].run_id || "")}</code></div>`; }));
+        $("historyRuns").querySelectorAll("[data-meta]").forEach((btn) => btn.addEventListener("click", () => { $(`histExtra${btn.dataset.meta}`).innerHTML = `<pre class="log">${esc(JSON.stringify(state.history[Number(btn.dataset.meta)], null, 2))}</pre>`; }));
+        $("historyRuns").querySelectorAll("[data-restore]").forEach((btn) => btn.addEventListener("click", () => { renderSettings(); }));
+      };
+      ["histModule", "histSort", "histSearch"].forEach((id) => $(id).addEventListener(id === "histSearch" ? "input" : "change", renderRuns));
+      renderRuns();
+    }
   }
 
   function renderSettings() {
@@ -1690,25 +1780,51 @@
     $("workspace").classList.remove("hidden");
     $("currentWorkspace").textContent = "Current workspace: Settings";
     $("workspace").innerHTML = `<button data-back>Back to Dashboard</button><div class="hc-breadcrumb">Dashboard / Settings</div><div class="hc-module-header"><div><h1>Settings</h1><p>Set global default plotting, smoothing, output, and history parameters.</p><div class="hc-tags"><span class="hc-tag">Defaults</span><span class="hc-tag">config.yaml</span><span class="hc-tag">Local</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>Session settings</strong></div></div>
-      <div class="panel grid three"><div><label>Marker size</label><input id="set_marker" type="range" min="0.5" max="8" step="0.5" value="${cfg.plot.marker_size}"></div><div><label>Line width</label><input id="set_line" type="range" min="0.2" max="3" step="0.1" value="${cfg.plot.line_width}"></div><div><label>Default heatmap palette</label><select id="set_cmap"><option>hc_nature</option><option>hc_soft</option><option>YlGnBu</option><option>BuGn</option><option>viridis</option><option>cividis</option><option>plasma</option></select></div><label class="check"><input id="set_smooth" type="checkbox" ${cfg.plot.smoothing.enabled ? "checked" : ""}> Smoothing enabled</label><div><label>Window length</label><input id="set_window" type="range" min="3" max="51" step="2" value="${cfg.plot.smoothing.window_length}"></div><div><label>Number of recent runs</label><input id="set_recent" type="range" min="3" max="10" value="${cfg.ui.recent_runs}"></div></div>
-      <div class="actions"><button class="primary" id="saveSettings">Save settings</button><button id="exportConfig">Export config.json</button><input id="importConfig" type="file" accept=".json"></div>`;
+      <div class="tabs" id="settingsTabs">${["Plot style", "Smoothing", "Y-axis", "Output", "History", "Import / Export"].map((tab, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-tab="${i}">${esc(tab)}</button>`).join("")}</div>
+      <div class="panel tab-panel" data-panel="0"><div class="grid three"><div><label>Marker size</label><input id="set_marker" type="range" min="0.5" max="8" step="0.5" value="${cfg.plot.marker_size}"></div><div><label>Line width</label><input id="set_line" type="range" min="0.2" max="3" step="0.1" value="${cfg.plot.line_width}"></div><div><label>Font family</label><input id="set_font" value="${esc(cfg.plotting.font_family || "Arial")}"></div><div><label>Marker alpha</label><input id="set_malpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.marker_alpha}"></div><div><label>Line alpha</label><input id="set_lalpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.line_alpha}"></div><div><label>Default heatmap palette</label><select id="set_cmap"><option>hc_soft</option><option>YlGnBu</option><option>BuGn</option><option>viridis</option><option>cividis</option><option>plasma</option></select></div></div></div>
+      <div class="panel tab-panel hidden" data-panel="1"><label class="check"><input id="set_smooth" type="checkbox" ${cfg.plot.smoothing.enabled ? "checked" : ""}> Enabled</label><div class="grid two"><div><label>Window length</label><input id="set_window" type="range" min="3" max="51" step="2" value="${cfg.plot.smoothing.window_length}"></div><div><label>Polyorder</label><input id="set_poly" type="range" min="1" max="5" value="${cfg.plot.smoothing.polyorder}"></div></div></div>
+      <div class="panel tab-panel hidden" data-panel="2"><label class="check"><input id="set_perwell" type="checkbox" ${cfg.plotting.y_axis.per_well ? "checked" : ""}> Per-well y-axis</label><div><label>Upper padding</label><input id="set_ypad" type="range" min="1" max="1.5" step="0.01" value="${cfg.plotting.y_axis.upper_padding}"></div><label class="check"><input id="set_nice" type="checkbox" ${cfg.plotting.y_axis.rounding_mode === "nice_round" ? "checked" : ""}> Nice rounding</label></div>
+      <div class="panel tab-panel hidden" data-panel="3"><div class="grid two"><div><label>Output root folder</label><input id="set_output_root" value="${esc(cfg.output.base_dir)}"></div><div><label>Run index path</label><input id="set_run_index" value="${esc(cfg.output.run_index)}"></div></div><label class="check"><input type="checkbox" checked disabled> Save metadata</label><label class="check"><input type="checkbox" checked disabled> Save config snapshot</label><label class="check"><input type="checkbox" checked disabled> Save processing log</label></div>
+      <div class="panel tab-panel hidden" data-panel="4"><label class="check"><input id="set_show_recent" type="checkbox" ${cfg.ui.show_recent_runs ? "checked" : ""}> Show recent runs on dashboard</label><div><label>Number of recent runs</label><input id="set_recent" type="range" min="3" max="10" value="${cfg.ui.recent_runs}"></div></div>
+      <div class="panel tab-panel hidden" data-panel="5"><button id="exportConfig">Export config.yaml</button><input id="importConfig" type="file" accept=".yaml,.yml,.json"><button id="loadConfig" type="button">Load imported config</button></div>
+      <div class="actions"><button class="primary" id="saveSettings">Save settings</button><button id="resetSettings">Reset to config.yaml</button></div>`;
     $("set_cmap").value = cfg.plotting.colors.heatmap;
     $("workspace").querySelector("[data-back]").addEventListener("click", renderDashboard);
+    $("settingsTabs").querySelectorAll("[data-tab]").forEach((btn) => btn.addEventListener("click", () => {
+      $("settingsTabs").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.toggle("hidden", panel.dataset.panel !== btn.dataset.tab));
+    }));
     $("saveSettings").addEventListener("click", () => {
       cfg.plot.marker_size = Number($("set_marker").value);
       cfg.plot.line_width = Number($("set_line").value);
+      cfg.plot.marker_alpha = Number($("set_malpha").value);
+      cfg.plot.line_alpha = Number($("set_lalpha").value);
+      cfg.plotting.font_family = $("set_font").value;
       cfg.plotting.colors.heatmap = $("set_cmap").value;
       cfg.plot.smoothing.enabled = getChecked("set_smooth");
       cfg.plot.smoothing.window_length = Number($("set_window").value);
+      cfg.plot.smoothing.polyorder = Number($("set_poly").value);
+      cfg.plotting.y_axis.per_well = getChecked("set_perwell");
+      cfg.plotting.y_axis.upper_padding = Number($("set_ypad").value);
+      cfg.plotting.y_axis.rounding_mode = getChecked("set_nice") ? "nice_round" : "raw";
+      cfg.output.base_dir = $("set_output_root").value;
+      cfg.output.run_index = $("set_run_index").value;
+      cfg.ui.show_recent_runs = getChecked("set_show_recent");
       cfg.ui.recent_runs = Number($("set_recent").value);
       saveConfig();
       renderSettings();
     });
-    $("exportConfig").addEventListener("click", () => downloadBlob(new TextEncoder().encode(JSON.stringify(cfg, null, 2)), "config.json", "application/json"));
-    $("importConfig").addEventListener("change", async () => {
+    $("resetSettings").addEventListener("click", () => {
+      state.config = deepCopy(DEFAULT_CONFIG);
+      saveConfig();
+      renderSettings();
+    });
+    $("exportConfig").addEventListener("click", () => downloadBlob(new TextEncoder().encode(configToYaml(cfg)), "config.yaml", "text/yaml"));
+    $("loadConfig").addEventListener("click", async () => {
       const file = $("importConfig").files[0];
       if (file) {
-        state.config = mergeDeep(deepCopy(DEFAULT_CONFIG), JSON.parse(await file.text()));
+        const text = await file.text();
+        state.config = mergeDeep(deepCopy(DEFAULT_CONFIG), file.name.endsWith(".json") ? JSON.parse(text) : parseSimpleYaml(text));
         saveConfig();
         renderSettings();
       }
