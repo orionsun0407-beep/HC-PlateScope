@@ -45,12 +45,89 @@
       return String(value ?? "").replace(/[&<>"']/g, (ch) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
     }
 
+    function clearPdfPreviews() {
+      for (const item of latestPdfPreviews) {
+        if (item.url) URL.revokeObjectURL(item.url);
+      }
+      latestPdfPreviews = [];
+      pdfZoom = 1;
+    }
+
+    function collectPdfPreviews(result) {
+      clearPdfPreviews();
+      const pdfs = result.pdfs || [];
+      for (const pdf of pdfs) {
+        try {
+          const bytes = pyodide.FS.readFile(pdf.path);
+          const blob = new Blob([bytes], { type: "application/pdf" });
+          latestPdfPreviews.push({ name: pdf.name, url: URL.createObjectURL(blob) });
+        } catch (err) {
+          console.warn("PDF 预览读取失败", pdf, err);
+        }
+      }
+    }
+
+    function currentPdfIndex() {
+      const selector = $("pdfSelect");
+      if (!selector) return 0;
+      return Math.max(0, Number(selector.value || 0));
+    }
+
+    function pdfPreviewHtml() {
+      if (!latestPdfPreviews.length) return "";
+      const selected = latestPdfPreviews[currentPdfIndex()] || latestPdfPreviews[0];
+      const width = Math.round(100 / pdfZoom);
+      const height = Math.round(760 / pdfZoom);
+      const options = latestPdfPreviews.map((item, index) => (
+        `<option value="${index}" ${item === selected ? "selected" : ""}>${escapeHtml(item.name)}</option>`
+      )).join("");
+      return `
+        <div class="pdf-preview">
+          <div class="pdf-toolbar">
+            <label>PDF 预览
+              <select id="pdfSelect">${options}</select>
+            </label>
+            <div class="pdf-zoom-controls">
+              <button type="button" id="pdfZoomOut">缩小</button>
+              <span>${Math.round(pdfZoom * 100)}%</span>
+              <button type="button" id="pdfZoomIn">放大</button>
+            </div>
+          </div>
+          <div class="pdf-frame-shell">
+            <iframe class="pdf-frame" title="PDF 预览" src="${selected.url}" style="width: ${width}%; height: ${height}px; transform: scale(${pdfZoom});"></iframe>
+          </div>
+        </div>`;
+    }
+
+    function bindPdfPreviewControls(result) {
+      const selector = $("pdfSelect");
+      if (selector) {
+        selector.addEventListener("change", () => renderResult(result));
+      }
+      const zoomOut = $("pdfZoomOut");
+      if (zoomOut) {
+        zoomOut.addEventListener("click", () => {
+          pdfZoom = Math.max(0.55, Math.round((pdfZoom - 0.15) * 100) / 100);
+          renderResult(result);
+        });
+      }
+      const zoomIn = $("pdfZoomIn");
+      if (zoomIn) {
+        zoomIn.addEventListener("click", () => {
+          pdfZoom = Math.min(2.2, Math.round((pdfZoom + 0.15) * 100) / 100);
+          renderResult(result);
+        });
+      }
+    }
+
     function renderResult(result) {
       $("summary").innerHTML = `
+        ${pdfPreviewHtml()}
         <div class="notice">
           运行完成：<strong>${escapeHtml(result.run_id)}</strong><br>
           模块：${escapeHtml(result.module_type)} · 孔板：${escapeHtml(result.plate_format)} · 警告：${result.warnings.length}
         </div>`;
+      bindPdfPreviewControls(result);
       const list = $("fileList");
       list.innerHTML = "";
       for (const file of result.files) {
@@ -72,6 +149,7 @@
       event.preventDefault();
       try {
         if (!pyodide) await initPython();
+        clearPdfPreviews();
         $("runBtn").disabled = true;
         $("downloadBtn").disabled = true;
         setNotice("正在运行分析...");
@@ -206,12 +284,20 @@ if preview_df is not None:
     small = preview_df.head(12).where(pd.notna(preview_df), "")
     preview = {"columns": [str(c) for c in small.columns], "rows": small.astype(str).to_dict(orient="records")}
 
+output_files = result.get("output_files", [])
+pdfs = []
+for f in output_files:
+    p = Path(f)
+    if p.suffix.lower() == ".pdf":
+        pdfs.append({"name": p.name, "path": str(p)})
+
 json.dumps({
     "run_id": metadata.get("run_id", ""),
     "module_type": metadata.get("module_type", module),
     "plate_format": metadata.get("plate_format", ""),
     "warnings": metadata.get("warnings", []),
-    "files": [str(Path(f).relative_to(run_dir)) if str(f).startswith(str(run_dir)) else str(f) for f in result.get("output_files", [])],
+    "files": [str(Path(f).relative_to(run_dir)) if str(f).startswith(str(run_dir)) else str(f) for f in output_files],
+    "pdfs": pdfs,
     "zip_path": str(zip_path),
     "zip_name": zip_name,
     "preview": preview,
@@ -220,6 +306,7 @@ json.dumps({
         const result = JSON.parse(raw);
         const zipBytes = pyodide.FS.readFile(result.zip_path);
         latestZip = { name: result.zip_name, blob: new Blob([zipBytes], { type: "application/zip" }) };
+        collectPdfPreviews(result);
         $("downloadBtn").disabled = false;
         renderResult(result);
         setNotice("分析完成，可以下载 outputs.zip。");
