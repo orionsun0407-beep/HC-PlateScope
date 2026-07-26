@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-yaxis-ten-ceil";
+  const APP_VERSION = "2026-07-27-portrait-report";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -959,12 +959,25 @@
     return { dataUrl: canvas.toDataURL("image/png"), canvas };
   }
 
-  async function svgToPdfBytes(svg) {
+  async function svgToPdfBytes(svg, options = {}) {
     await loadScriptOnce("pdf");
     const { jsPDF } = window.jspdf;
     const { width, height } = svgSize(svg);
-    const pdf = new jsPDF({ orientation: width > height ? "landscape" : "portrait", unit: "pt", format: [width, height] });
     const { dataUrl } = await svgToPngDataUrl(svg, 2);
+    if (options.forcePortrait) {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = 595.28;
+      const pageHeight = 841.89;
+      const margin = 24;
+      const scale = Math.min((pageWidth - margin * 2) / width, (pageHeight - margin * 2) / height);
+      const imageWidth = width * scale;
+      const imageHeight = height * scale;
+      const x = (pageWidth - imageWidth) / 2;
+      const y = (pageHeight - imageHeight) / 2;
+      pdf.addImage(dataUrl, "PNG", x, y, imageWidth, imageHeight);
+      return pdf.output("arraybuffer");
+    }
+    const pdf = new jsPDF({ orientation: width > height ? "landscape" : "portrait", unit: "pt", format: [width, height] });
     pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
     return pdf.output("arraybuffer");
   }
@@ -1029,7 +1042,8 @@
   }
 
   async function addFigureFiles(files, basePath, svg) {
-    files.push({ path: `${basePath}.pdf`, bytes: await svgToPdfBytes(svg), previewSvg: svg });
+    const forcePortrait = basePath.startsWith("report/") && basePath.includes("combined_report");
+    files.push({ path: `${basePath}.pdf`, bytes: await svgToPdfBytes(svg, { forcePortrait }), previewSvg: svg });
   }
 
   function selectedWellSeries(result) {
