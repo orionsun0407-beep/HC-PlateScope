@@ -1,4 +1,4 @@
-    const APP_VERSION = "2026-07-08-cmap-fix";
+    const APP_VERSION = "2026-07-26-pdf-plot-preview";
     const PY_FILE_PATHS = ['plate_processor/__init__.py', 'plate_processor/analysis_common.py', 'plate_processor/anti_analysis.py', 'plate_processor/io.py', 'plate_processor/logging_utils.py', 'plate_processor/lss_analysis.py', 'plate_processor/peak_analysis.py', 'plate_processor/plotting.py', 'plate_processor/preprocessing.py', 'plate_processor/report.py', 'plate_processor/selected_well_plots.py', 'plate_processor/utils.py'];
     const CONFIG_PATH = "config.yaml";
     const BASE = "/home/pyodide/hc_platescope";
@@ -55,6 +55,8 @@
     let pyodide = null;
     let latestZip = null;
     let latestWellPlotInfo = null;
+    let latestPdfPreviews = [];
+    let pdfZoom = 1;
 
     const $ = (id) => document.getElementById(id);
 
@@ -109,6 +111,7 @@
       activeModule = key;
       currentView = "module";
       latestZip = null;
+      if (typeof clearPdfPreviews === "function") clearPdfPreviews();
       $("downloadBtn").disabled = true;
       $("dashboardView").classList.add("hidden");
       $("workspaceView").classList.remove("hidden");
