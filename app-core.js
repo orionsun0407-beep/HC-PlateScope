@@ -53,6 +53,8 @@
     let currentView = "dashboard";
     let pyodide = null;
     let latestZip = null;
+    let latestPdfPreviews = [];
+    let pdfZoom = 1;
 
     const $ = (id) => document.getElementById(id);
 
@@ -103,6 +105,7 @@
       activeModule = key;
       currentView = "module";
       latestZip = null;
+      if (typeof clearPdfPreviews === "function") clearPdfPreviews();
       $("downloadBtn").disabled = true;
       $("dashboardView").classList.add("hidden");
       $("workspaceView").classList.remove("hidden");
