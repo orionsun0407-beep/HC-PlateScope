@@ -252,6 +252,11 @@ th { position: sticky; top: 0; background: #F7FAF8; color: var(--hc-green); z-in
   overflow: auto;
 }
 .hc-pdf-preview svg { width: max(980px, calc(100% * var(--preview-zoom, 1))); max-width: none; height: auto; display: block; }
+.hc-pdf-iframe {
+  width: 100%;
+  border: 1px solid var(--hc-border);
+  overflow: hidden;
+}
 .pdf-preview {
   width: calc(100% + 1.8rem);
   margin: 0 -0.9rem 1rem;

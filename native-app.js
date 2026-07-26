@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-portrait-report";
+  const APP_VERSION = "2026-07-27-streamlit-clone";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -120,6 +120,7 @@
     history: loadHistory(),
     debug: false,
     reportZoom: 1,
+    reportPreviewUrl: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -700,7 +701,7 @@
     const padding = Number(yCfg.upper_padding || 1.1);
     const rawMax = Math.max(...ys);
     const padded = Number.isFinite(rawMax) && rawMax > 0 ? rawMax * padding : padding;
-    const ymax = normalized ? Math.max(padding, padded) : ceilingToNearestTen(padded);
+    const ymax = ceilingToNearestTen(padded);
     return {
       xmin: Math.min(...xs),
       xmax: Math.max(...xs),
@@ -1297,7 +1298,7 @@
           <h1>HC PlateScope</h1>
           <p class="hc-hero-subtitle">A cozy workspace for 96-well plate spectra analysis.</p>
           <p class="hc-hero-copy">Local-first analysis workspace for well ID extraction, spectra processing, peak detection, ratio heatmaps, and reproducible reports.</p>
-          <div class="hc-tags"><span class="hc-tag">Clean</span><span class="hc-tag">Reproducible</span><span class="hc-tag">Nature-style figures</span><span class="hc-tag">browser history</span></div>
+          <div class="hc-tags"><span class="hc-tag">Clean</span><span class="hc-tag">Reproducible</span><span class="hc-tag">Nature-style figures</span><span class="hc-tag">outputs/ history</span></div>
         </div>
         <div class="hc-plate-wrap"><div class="hc-plate-title">96-well layout</div><div class="hc-plate-grid">${plateDecoration()}</div></div>
       </div>
@@ -1305,14 +1306,14 @@
       <div class="feature-grid dashboard-row">${["wellid", "geco", "luci"].map(featureCard).join("")}</div>
       <div class="feature-grid dashboard-row">${["lss", "anti"].map(featureCard).join("")}
         <div class="feature-slot">
-          <div class="hc-feature-card hc-accent-teal"><div class="hc-accent-line"></div><h3>Analysis History</h3><p>Browse browser-local runs, metadata, reports, and restored settings.</p><div class="hc-tags"><span class="hc-tag">history</span><span class="hc-tag">metadata</span><span class="hc-tag">settings</span></div></div>
+          <div class="hc-feature-card hc-accent-teal"><div class="hc-accent-line"></div><h3>Analysis History</h3><p>Browse runs, metadata, reports, and restored settings.</p><div class="hc-tags"><span class="hc-tag">outputs/</span><span class="hc-tag">metadata</span><span class="hc-tag">settings</span></div></div>
           <button class="card-button" data-page="history">Open history</button>
           <button class="card-button" data-page="settings">Settings</button>
         </div>
       </div>
       <div class="two-col">
-        <div>${section("Recent runs", "Latest browser-local records.")}${historyPreview()}</div>
-        <div class="hc-info-card hc-success"><strong>Local-first analysis</strong><div>All analyses run inside this browser.</div><div>Use Download outputs.zip to save a permanent run folder.</div></div>
+        <div>${section("Recent runs", "Latest local records from outputs/run_index.csv.")}${historyPreview()}</div>
+        <div class="hc-info-card hc-success"><strong>Local-first analysis</strong><div>All analyses are executed locally in this browser.</div><div>Download outputs.zip to save inputs, figures, tables, metadata, logs, and config snapshots.</div></div>
       </div>`;
     $("dashboard").querySelectorAll("[data-module]").forEach((btn) => btn.addEventListener("click", () => renderModule(btn.dataset.module)));
     $("dashboard").querySelectorAll("[data-page]").forEach((btn) => btn.addEventListener("click", () => btn.dataset.page === "history" ? renderHistory() : renderSettings()));
@@ -1336,7 +1337,7 @@
   }
 
   function historyPreview() {
-    if (!state.history.length) return `<div class="hc-info-card"><strong>No history found</strong><div>No browser-local runs yet.</div></div>`;
+    if (!state.history.length) return `<div class="hc-info-card"><strong>No history found</strong><div>No local runs yet.</div></div>`;
     return `<div>${state.history.slice(0, state.config.ui.recent_runs || 5).map((row) => `<div class="hc-history-card panel"><strong>${esc(row.run_name || row.run_id)}</strong><p>${esc(row.module_type)} - ${esc(row.timestamp)}</p><p>${esc(row.input_files)}</p></div>`).join("")}</div>`;
   }
 
@@ -1387,7 +1388,7 @@
           <div><label>Rows per PDF page</label><input id="${module}_rows_page" type="number" min="2" max="16" value="${cfg.plotting.spectra_grid.rows_per_page}"></div>
         </div>
         <div class="settings-checks">
-          <label class="check"><input id="${module}_smooth" type="checkbox" disabled> 原始点连线</label>
+          <label class="check"><input id="${module}_smooth" type="checkbox" disabled> Raw point-to-point lines</label>
           <label class="check"><input id="${module}_perwell" type="checkbox" checked> Per-well y-axis</label>
           ${includeHeatmap ? `<label class="check"><input id="${module}_heat_vals" type="checkbox" checked> Show heatmap values</label><label class="check"><input id="${module}_robust" type="checkbox" checked> Robust heatmap scale</label>` : ""}
         </div>
@@ -1467,7 +1468,7 @@
   }
 
   function runStep(label) {
-    return `${step(3, "Run analysis")}<div class="panel"><div class="hc-info-card">This native GitHub Pages version runs directly in the browser without Streamlit or Python initialization.</div><button class="primary" type="submit">${esc(label)}</button></div>`;
+    return `${step(3, "Run analysis")}<div class="panel"><div class="hc-info-card">Analysis runs locally in your browser. Download outputs.zip to keep a permanent run folder.</div><button class="primary" type="submit">${esc(label)}</button></div>`;
   }
 
   function wireModuleControls(module) {
@@ -1557,12 +1558,19 @@
 
   function renderResult(result) {
     const area = $("resultArea");
-    const report = result.files.find((file) => file.path.includes("combined_report") && file.previewSvg);
+    const report = result.files.find((file) => file.path.includes("combined_report") && file.path.endsWith(".pdf"));
+    if (state.reportPreviewUrl) {
+      URL.revokeObjectURL(state.reportPreviewUrl);
+      state.reportPreviewUrl = null;
+    }
+    if (report) {
+      state.reportPreviewUrl = URL.createObjectURL(new Blob([report.bytes], { type: "application/pdf" }));
+    }
     const downloads = resultDownloadFiles(result);
     const summaryName = result.module === "wellid" ? "Preview table" : result.module === "geco" ? "Peak ratio preview" : result.module === "luci" ? "Peak summary preview" : result.module === "lss" ? "LSS summary preview" : "Normalization summary preview";
     area.innerHTML = `
-      ${step(4, "Results & downloads", "Inspect summary, warnings, previews, and browser output files.")}
-      ${report ? `<div class="panel"><div class="pdf-toolbar"><h2>Report preview</h2><div class="pdf-zoom-controls"><button type="button" id="reportZoomOut">缩小</button><span>${Math.round(state.reportZoom * 100)}%</span><button type="button" id="reportZoomIn">放大</button></div></div><div class="hc-pdf-preview" style="--preview-zoom: ${state.reportZoom};">${report.previewSvg}</div></div>` : ""}
+      ${step(4, "Results & downloads", "Inspect summary, warnings, previews, and local output files.")}
+      ${report ? `<div class="panel"><div class="pdf-toolbar"><h2>Report preview</h2><div class="actions"><button type="button" id="downloadReportPdf">Download report PDF</button></div></div><iframe class="hc-pdf-preview hc-pdf-iframe" src="${state.reportPreviewUrl}#toolbar=1&navpanes=0&scrollbar=1" title="Report preview"></iframe></div>` : ""}
       <div class="panel">
         <div class="hc-info-card hc-success"><strong>Analysis complete: ${esc(result.id)}</strong></div>
         ${kpis(result)}
@@ -1573,20 +1581,13 @@
       <div class="panel"><h2>${esc(summaryName)}</h2>${tableHtml(result.summary.slice(0, 100))}</div>
       ${selectedWellPanel(result)}
     `;
+    if ($("downloadReportPdf")) $("downloadReportPdf").addEventListener("click", () => downloadBlob(report.bytes, report.path.split("/").pop(), "application/pdf"));
     $("downloadZip").addEventListener("click", async () => downloadBlob(await buildOutputsZip(result), `${result.id}_outputs.zip`, "application/zip"));
     area.querySelectorAll("[data-download-index]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const file = downloads[Number(btn.dataset.downloadIndex)];
         downloadBlob(file.bytes, file.path.split("/").pop(), mimeForPath(file.path));
       });
-    });
-    if ($("reportZoomOut")) $("reportZoomOut").addEventListener("click", () => {
-      state.reportZoom = Math.max(0.6, Math.round((state.reportZoom - 0.15) * 100) / 100);
-      renderResult(result);
-    });
-    if ($("reportZoomIn")) $("reportZoomIn").addEventListener("click", () => {
-      state.reportZoom = Math.min(2.2, Math.round((state.reportZoom + 0.15) * 100) / 100);
-      renderResult(result);
     });
     wireSelectedWellPanel(result);
   }
@@ -1614,7 +1615,7 @@
     const metric = defaultMetric(result.module, metrics);
     const selected = defaultSelectedWells(result.summary, series.wells, metric);
     return `<div class="panel" id="selectedWellPanel"><h2>Selected well smooth scatter plots</h2><p>Choose good wells, preview one plot, then export one independent figure per well.</p>
-      <div class="grid three"><div><label>Recommend wells by</label><select id="wellMetric">${metrics.map((m) => `<option ${m === metric ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div><label class="check"><input id="wellSmooth" type="checkbox" disabled> 原始点连线</label><div><label>TIF resolution</label><select id="wellDpi"><option>300</option><option selected>600</option><option>1200</option></select></div></div>
+      <div class="grid three"><div><label>Recommend wells by</label><select id="wellMetric">${metrics.map((m) => `<option ${m === metric ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div><label class="check"><input id="wellSmooth" type="checkbox" disabled> Raw point-to-point lines</label><div><label>TIF resolution</label><select id="wellDpi"><option>300</option><option selected>600</option><option>1200</option></select></div></div>
       <div class="grid two"><div><label>Good wells</label><select id="wellSelect" multiple size="10">${series.wells.map((w) => `<option value="${esc(w)}" ${selected.includes(w) ? "selected" : ""}>${esc(w)}</option>`).join("")}</select><div class="field-note">Hold Shift or Command to select multiple wells.</div></div><div><label>Smoothing window</label><input id="wellWindow" type="number" min="5" max="51" step="2" value="11"><div class="actions"><button id="previewWell" type="button">Preview first well</button><button id="svgWell" type="button">Download SVG ZIP</button><button id="pdfWell" type="button">Download PDF ZIP</button><button id="tifWell" type="button">Download TIF ZIP</button><button id="dataWell" type="button">Download Data ZIP</button></div></div></div>
       <div id="wellPreview" class="preview-card"></div></div>`;
   }
@@ -1679,7 +1680,7 @@
     $("dashboard").classList.add("hidden");
     $("workspace").classList.remove("hidden");
     $("currentWorkspace").textContent = "Current workspace: Analysis History";
-    $("workspace").innerHTML = `<button data-back>Back to Dashboard</button><div class="hc-breadcrumb">Dashboard / Analysis History</div><div class="hc-module-header"><div><h1>Analysis History</h1><p>Browse previous analysis runs stored in this browser.</p><div class="hc-tags"><span class="hc-tag">Local records</span><span class="hc-tag">Metadata</span><span class="hc-tag">Reproducibility</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>browser localStorage</strong></div></div>${section("Runs", `${state.history.length} record(s) shown.`)}${state.history.length ? tableHtml(state.history) : `<div class="hc-info-card">No history found.</div>`}`;
+    $("workspace").innerHTML = `<button data-back>Back to Dashboard</button><div class="hc-breadcrumb">Dashboard / Analysis History</div><div class="hc-module-header"><div><h1>Analysis History</h1><p>Browse previous analysis runs stored locally in this browser.</p><div class="hc-tags"><span class="hc-tag">Local records</span><span class="hc-tag">Metadata</span><span class="hc-tag">Reproducibility</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>outputs/run_index.csv</strong></div></div>${section("Runs", `${state.history.length} record(s) shown.`)}${state.history.length ? tableHtml(state.history) : `<div class="hc-info-card">No history found.</div>`}`;
     $("workspace").querySelector("[data-back]").addEventListener("click", renderDashboard);
   }
 
@@ -1688,7 +1689,7 @@
     $("dashboard").classList.add("hidden");
     $("workspace").classList.remove("hidden");
     $("currentWorkspace").textContent = "Current workspace: Settings";
-    $("workspace").innerHTML = `<button data-back>Back to Dashboard</button><div class="hc-breadcrumb">Dashboard / Settings</div><div class="hc-module-header"><div><h1>Settings</h1><p>Set global default plotting, smoothing, output, and history parameters.</p><div class="hc-tags"><span class="hc-tag">Defaults</span><span class="hc-tag">browser</span><span class="hc-tag">GitHub Pages</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>Session settings</strong></div></div>
+    $("workspace").innerHTML = `<button data-back>Back to Dashboard</button><div class="hc-breadcrumb">Dashboard / Settings</div><div class="hc-module-header"><div><h1>Settings</h1><p>Set global default plotting, smoothing, output, and history parameters.</p><div class="hc-tags"><span class="hc-tag">Defaults</span><span class="hc-tag">config.yaml</span><span class="hc-tag">Local</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>Session settings</strong></div></div>
       <div class="panel grid three"><div><label>Marker size</label><input id="set_marker" type="range" min="0.5" max="8" step="0.5" value="${cfg.plot.marker_size}"></div><div><label>Line width</label><input id="set_line" type="range" min="0.2" max="3" step="0.1" value="${cfg.plot.line_width}"></div><div><label>Default heatmap palette</label><select id="set_cmap"><option>hc_nature</option><option>hc_soft</option><option>YlGnBu</option><option>BuGn</option><option>viridis</option><option>cividis</option><option>plasma</option></select></div><label class="check"><input id="set_smooth" type="checkbox" ${cfg.plot.smoothing.enabled ? "checked" : ""}> Smoothing enabled</label><div><label>Window length</label><input id="set_window" type="range" min="3" max="51" step="2" value="${cfg.plot.smoothing.window_length}"></div><div><label>Number of recent runs</label><input id="set_recent" type="range" min="3" max="10" value="${cfg.ui.recent_runs}"></div></div>
       <div class="actions"><button class="primary" id="saveSettings">Save settings</button><button id="exportConfig">Export config.json</button><input id="importConfig" type="file" accept=".json"></div>`;
     $("set_cmap").value = cfg.plotting.colors.heatmap;
