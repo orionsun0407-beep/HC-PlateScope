@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-26-native-repair";
+  const APP_VERSION = "2026-07-27-yaxis-label-fix";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -130,7 +130,11 @@
     const n = Number(String(value).replace(/,/g, "").trim());
     return Number.isFinite(n) ? n : NaN;
   };
-  const fmt = (value, digits = 3) => Number.isFinite(value) ? Number(value).toFixed(digits).replace(/\.?0+$/, "") : "";
+  const fmt = (value, digits = 3) => {
+    if (!Number.isFinite(value)) return "";
+    if (digits <= 0) return String(Math.round(Number(value)));
+    return Number(value).toFixed(digits).replace(/\.?0+$/, "");
+  };
   const nowIso = () => new Date().toISOString();
   const runId = (module) => `${module}_${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}`;
 
