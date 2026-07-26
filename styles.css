@@ -297,6 +297,10 @@ summary { font-size: 0.88rem; color: var(--hc-text); cursor: pointer; }
   background: #F3F5FA;
   cursor: pointer;
 }
+.hc-upload-box.is-dragover {
+  outline: 2px solid rgba(107, 183, 168, 0.55);
+  background: #ECF8F4;
+}
 .hc-upload-box input[type="file"] {
   position: absolute;
   width: 1px;

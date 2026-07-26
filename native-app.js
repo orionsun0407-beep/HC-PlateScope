@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-streamlit-secondary-parity";
+  const APP_VERSION = "2026-07-27-dragdrop-report-parity";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -717,7 +717,8 @@
   }
 
   function wellPanelSvg({ tables, labels, colors, well, title, x, y, width, height, smooth = true, windowLength = 9, badge, config = DEFAULT_CONFIG, normalized = false, moduleKey = "" }) {
-    const pad = { l: 32, r: 10, t: 18, b: 36 };
+    const compact = width < 80 || height < 80;
+    const pad = compact ? { l: 13, r: 4, t: 8, b: 15 } : { l: 32, r: 10, t: 18, b: 36 };
     const innerW = width - pad.l - pad.r;
     const innerH = height - pad.t - pad.b;
     const range = seriesRange(tables[0], [well], config, normalized);
@@ -734,8 +735,8 @@
     }
     const sx = (v) => x + pad.l + ((v - range.xmin) / Math.max(1e-9, range.xmax - range.xmin)) * innerW;
     const sy = (v) => y + pad.t + innerH - ((v - range.ymin) / Math.max(1e-9, range.ymax - range.ymin)) * innerH;
-    const markerRadius = Math.max(0.75, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.7);
-    const lineWidth = Math.max(0.6, Number(config.plot?.line_width || config.plotting?.line_width || 1));
+    const markerRadius = compact ? Math.max(0.28, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.32) : Math.max(0.75, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.7);
+    const lineWidth = compact ? Math.max(0.28, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 0.42) : Math.max(0.6, Number(config.plot?.line_width || config.plotting?.line_width || 1));
     const markerAlpha = Number(config.plot?.marker_alpha || config.plotting?.alpha || 0.55);
     const lineAlpha = Number(config.plot?.line_alpha || config.plotting?.line_alpha || 0.95);
     const grid = [];
@@ -743,14 +744,14 @@
     for (const tick of ticks) {
       const gx = sx(tick);
       grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": 0.45 }));
-      grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + 3, stroke: "#333", "stroke-width": 0.45 }));
-      grid.push(svgEl("text", { x: gx + 1, y: y + height - 6, "font-size": 5.2, fill: "#444", transform: `rotate(-90 ${gx + 1} ${y + height - 6})` }, fmt(tick, 0)));
+      grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + (compact ? 1.5 : 3), stroke: "#333", "stroke-width": compact ? 0.25 : 0.45 }));
+      grid.push(svgEl("text", { x: gx + 0.7, y: y + height - (compact ? 3.5 : 6), "font-size": compact ? 2.6 : 5.2, fill: "#444", transform: `rotate(-90 ${gx + 0.7} ${y + height - (compact ? 3.5 : 6)})` }, fmt(tick, 0)));
     }
     for (const tick of yTicks) {
       const gy = sy(tick);
       grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#EAEAEA", "stroke-width": 0.45 }));
-      grid.push(svgEl("line", { x1: x + pad.l - 3, y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": 0.45 }));
-      grid.push(svgEl("text", { x: x + pad.l - 5, y: gy + 2, "text-anchor": "end", "font-size": 5.5, fill: "#444" }, fmt(tick, tick >= 10 ? 0 : 1)));
+      grid.push(svgEl("line", { x1: x + pad.l - (compact ? 1.5 : 3), y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": compact ? 0.25 : 0.45 }));
+      grid.push(svgEl("text", { x: x + pad.l - (compact ? 2.4 : 5), y: gy + (compact ? 1.1 : 2), "text-anchor": "end", "font-size": compact ? 2.8 : 5.5, fill: "#444" }, fmt(tick, tick >= 10 ? 0 : 1)));
     }
     if (!ticks.length) {
       for (let i = 0; i <= 4; i += 1) {
@@ -770,32 +771,36 @@
       const d = pts.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(2)} ${sy(yValues[i]).toFixed(2)}`).join(" ");
       plots.push(svgEl("path", { d, fill: "none", stroke: colors[idx], "stroke-width": lineWidth.toFixed(2), opacity: lineAlpha }));
     });
-    const badgeSvg = badge ? svgEl("rect", { x: x + width - 48, y: y + 18, width: 40, height: 14, rx: 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
-      svgEl("text", { x: x + width - 28, y: y + 28.5, "text-anchor": "middle", "font-size": 7.2, "font-weight": "700", fill: "white" }, badge.text) : "";
+    const badgeW = compact ? 16 : 40;
+    const badgeH = compact ? 6 : 14;
+    const badgeSvg = badge ? svgEl("rect", { x: x + width - badgeW - (compact ? 3 : 8), y: y + (compact ? 7 : 18), width: badgeW, height: badgeH, rx: compact ? 1.2 : 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
+      svgEl("text", { x: x + width - badgeW / 2 - (compact ? 3 : 8), y: y + (compact ? 11.4 : 28.5), "text-anchor": "middle", "font-size": compact ? 3.2 : 7.2, "font-weight": "700", fill: "white" }, badge.text) : "";
     const titleAttrs = moduleKey === "geco"
       ? { x: x + width - 8, y: y + 12, "text-anchor": "end" }
       : { x: x + 8, y: y + 12, "text-anchor": "start" };
     return svgEl("g", {}, [
       svgEl("rect", { x, y, width, height, fill: "white" }),
       ...grid,
-      svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": 0.75 }),
-      svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": 0.75 }),
+      svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.35 : 0.75 }),
+      svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.35 : 0.75 }),
       ...plots,
-      svgEl("text", { ...titleAttrs, "font-size": 8, "font-weight": "700", fill: "#333" }, title || well),
+      svgEl("text", { ...titleAttrs, "font-size": compact ? 3.8 : 8, "font-weight": "700", fill: "#333" }, title || well),
       badgeSvg,
     ].join(""));
   }
 
-  function gridSvg({ title, tables, labels, wells, config, normalized = false, moduleKey = "", highlights = {} }) {
+  function gridSvg({ title, tables, labels, wells, config, normalized = false, moduleKey = "", highlights = {}, report = false }) {
     const layout = config.plotting.spectra_grid || {};
     const ncols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plateLayout(config, wells).cols.length;
     const pageWells = wells.slice();
-    const panelW = 128;
-    const panelH = 100;
-    const gap = 14;
+    const panelW = report ? 44 : 128;
+    const panelH = report ? 54 : 100;
+    const gap = report ? 5 : 14;
     const rows = Math.ceil(pageWells.length / ncols);
-    const width = 42 + ncols * panelW + (ncols - 1) * gap;
-    const height = 74 + rows * panelH + (rows - 1) * gap;
+    const left = report ? 12 : 22;
+    const top = report ? 27 : 48;
+    const width = (report ? 24 : 42) + ncols * panelW + (ncols - 1) * gap;
+    const height = (report ? 42 : 74) + rows * panelH + (rows - 1) * gap;
     const colors = [config.plotting.colors.primary, config.plotting.colors.secondary];
     const panels = pageWells.map((well, idx) => {
       const col = idx % ncols;
@@ -806,8 +811,8 @@
         colors,
         well,
         title: well,
-        x: 22 + col * (panelW + gap),
-        y: 48 + row * (panelH + gap),
+        x: left + col * (panelW + gap),
+        y: top + row * (panelH + gap),
         width: panelW,
         height: panelH,
         smooth: config.plot.smoothing.enabled,
@@ -820,9 +825,9 @@
     }).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="24" text-anchor="middle" font-size="18" font-weight="700" fill="#111">${esc(title)}</text>
+      <text x="${width / 2}" y="${report ? 13 : 24}" text-anchor="middle" font-size="${report ? 9 : 18}" font-weight="700" fill="#111">${esc(title)}</text>
       ${panels}
-      <text x="${width / 2}" y="${height - 10}" text-anchor="middle" font-size="10" fill="#444">Wavelength (nm)</text>
+      <text x="${width / 2}" y="${height - (report ? 3 : 10)}" text-anchor="middle" font-size="${report ? 4.8 : 10}" fill="#444">Wavelength (nm)</text>
     </svg>`;
   }
 
@@ -861,18 +866,20 @@
   function combineReportSvg(title, grid, heatmap) {
     const gridBox = svgSize(grid);
     const heatBox = svgSize(heatmap);
-    const margin = 36;
-    const gap = 54;
-    const width = Math.max(900, gridBox.width + margin * 2, heatBox.width + margin * 2);
-    const height = 72 + gridBox.height + gap + heatBox.height + 42;
-    const gridX = (width - gridBox.width) / 2;
-    const heatX = (width - heatBox.width) / 2;
-    const heatY = 72 + gridBox.height + gap;
+    const width = 595.28;
+    const height = 841.89;
+    const marginX = 34;
+    const gridRegion = { x: marginX, y: 58, width: width - marginX * 2, height: 360 };
+    const heatRegion = { x: 116, y: 506, width: width - 232, height: 250 };
+    const gridScale = Math.min(gridRegion.width / gridBox.width, gridRegion.height / gridBox.height);
+    const heatScale = Math.min(heatRegion.width / heatBox.width, heatRegion.height / heatBox.height);
+    const gridX = gridRegion.x + (gridRegion.width - gridBox.width * gridScale) / 2;
+    const heatX = heatRegion.x + (heatRegion.width - heatBox.width * heatScale) / 2;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="30" text-anchor="middle" font-size="22" font-weight="700" fill="#111">${esc(title)}</text>
-      <g transform="translate(${gridX.toFixed(2)} 58)">${stripSvg(grid)}</g>
-      <g transform="translate(${heatX.toFixed(2)} ${heatY.toFixed(2)})">${stripSvg(heatmap)}</g>
+      <text x="${width / 2}" y="32" text-anchor="middle" font-size="11" font-weight="700" fill="#111">${esc(title)}</text>
+      <g transform="translate(${gridX.toFixed(2)} ${gridRegion.y}) scale(${gridScale.toFixed(5)})">${stripSvg(grid)}</g>
+      <g transform="translate(${heatX.toFixed(2)} ${heatRegion.y}) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
     </svg>`;
   }
 
@@ -1004,7 +1011,7 @@
       const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
       const pageWidth = 595.28;
       const pageHeight = 841.89;
-      const margin = 24;
+      const margin = Math.abs(width - pageWidth) < 1 && Math.abs(height - pageHeight) < 1 ? 0 : 24;
       const scale = Math.min((pageWidth - margin * 2) / width, (pageHeight - margin * 2) / height);
       const imageWidth = width * scale;
       const imageHeight = height * scale;
@@ -1183,8 +1190,9 @@
     const heat = heatmapValues(summary, is384 ? "ratio" : "ratio");
     const highlights = Object.fromEntries(summary.map((row) => [row.well_id, [{ text: fmt(row.ratio, 2), color: config.plotting.badges.geco_ratio }]]));
     const grid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights });
+    const reportGrid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true });
     const heatSvg = heatmapSvg(heat, config, is384 ? "GECO 384 paired max(with CA) / max(without CA)" : "GECO max(with ca) / max(without ca)", "ratio");
-    const reportSvg = combineReportSvg(is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap", grid, heatSvg);
+    const reportSvg = combineReportSvg(is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap", reportGrid, heatSvg);
     const files = [{ path: "tables/GECO_peak_ratio.csv", bytes: csvBytes(summary) }];
     await addFigureFiles(files, "figures/GECO_grid_plots", grid);
     await addFigureFiles(files, "figures/GECO_heatmap", heatSvg);
@@ -1206,8 +1214,9 @@
     const heat = heatmapValues(summary, "ratio_520_450");
     const highlights = Object.fromEntries(summary.map((row) => [row.well_id, [{ text: fmt(row.ratio_520_450, 2), color: config.plotting.badges.luci_ratio }]]));
     const grid = gridSvg({ title: "LUCI normalized spectra", tables: [norm], labels: ["LUCI"], wells, config, normalized: true, moduleKey: "luci", highlights });
+    const reportGrid = gridSvg({ title: "LUCI normalized spectra", tables: [norm], labels: ["LUCI"], wells, config, normalized: true, moduleKey: "luci", highlights, report: true });
     const heatSvg = heatmapSvg(heat, config, "LUCI 520/450 ratio", "ratio_520_450");
-    const reportSvg = combineReportSvg("LUCI spectra and 520/450 ratio heatmap", grid, heatSvg);
+    const reportSvg = combineReportSvg("LUCI spectra and 520/450 ratio heatmap", reportGrid, heatSvg);
     const files = [
       { path: "tables/LUCI_normalized.xlsx", bytes: tableToXlsxBytes(norm, "normalized") },
       { path: "tables/LUCI_peak_summary.csv", bytes: csvBytes(summary) },
@@ -1242,8 +1251,9 @@
     });
     const heat = heatmapValues(summary, "peak_wavelength_distance");
     const grid = gridSvg({ title: "LSS raw spectra", tables: [emission, excitation], labels: ["Emission", "Excitation"], wells, config, moduleKey: "lss", highlights });
+    const reportGrid = gridSvg({ title: "LSS raw spectra", tables: [emission, excitation], labels: ["Emission", "Excitation"], wells, config, moduleKey: "lss", highlights, report: true });
     const heatSvg = heatmapSvg(heat, config, "LSS Stokes shift", "Stokes shift (nm)");
-    const reportSvg = combineReportSvg("LSS raw spectra and Stokes shift heatmap", grid, heatSvg);
+    const reportSvg = combineReportSvg("LSS raw spectra and Stokes shift heatmap", reportGrid, heatSvg);
     const columns = Object.keys(summary[0] || {});
     const files = [
       { path: "tables/LSS_summary.csv", bytes: csvBytes(summary) },
@@ -1539,12 +1549,43 @@
       });
     }
     if (module === "geco") renderGecoFiles();
-    document.querySelectorAll("input[type=file]").forEach((input) => input.addEventListener("change", () => {
+    document.querySelectorAll("input[type=file]").forEach((input) => initFileUpload(input, module));
+    updateReadyState(module);
+  }
+
+  function initFileUpload(input, module) {
+    if (!input || input.dataset.bound === "1") return;
+    input.dataset.bound = "1";
+    const box = input.closest(".hc-upload-box");
+    const onFileChange = () => {
       const note = $(`${input.id}_note`);
       if (note && input.files[0]) note.innerHTML = `<span class="hc-file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span><span>${esc(input.files[0].name.split(".").pop().toUpperCase())}</span></span>`;
       updateReadyState(module);
+    };
+    input.addEventListener("change", onFileChange);
+    if (!box) return;
+    ["dragenter", "dragover"].forEach((type) => box.addEventListener(type, (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      box.classList.add("is-dragover");
     }));
-    updateReadyState(module);
+    ["dragleave", "drop"].forEach((type) => box.addEventListener(type, (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      box.classList.remove("is-dragover");
+    }));
+    box.addEventListener("drop", (event) => {
+      const files = event.dataTransfer?.files;
+      if (!files || !files.length) return;
+      try {
+        const transfer = new DataTransfer();
+        transfer.items.add(files[0]);
+        input.files = transfer.files;
+      } catch {
+        input.files = files;
+      }
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
   }
 
   function renderGecoFiles() {
@@ -1552,11 +1593,7 @@
     $("gecoFiles").innerHTML = is384
       ? `<div class="hc-upload-row single">${fileField("geco_paired", "Upload 384-well paired GECO table")}</div><div class="hc-info-card"><strong>GECO 384 pairing rule</strong><div>Upload one table with A01-P24 well columns.</div><div>Odd columns are without CA; adjacent even columns are with CA.</div></div>`
       : `<div class="hc-upload-row two">${fileField("geco_with", "Upload with CA table")}${fileField("geco_without", "Upload without CA table")}</div>`;
-    $("gecoFiles").querySelectorAll("input[type=file]").forEach((input) => input.addEventListener("change", () => {
-      const note = $(`${input.id}_note`);
-      if (note && input.files[0]) note.innerHTML = `<span class="hc-file-pill"><strong>${esc(input.files[0].name)}</strong><span>${(input.files[0].size / 1024).toFixed(1)} KB</span><span>${esc(input.files[0].name.split(".").pop().toUpperCase())}</span></span>`;
-      updateReadyState("geco");
-    }));
+    $("gecoFiles").querySelectorAll("input[type=file]").forEach((input) => initFileUpload(input, "geco"));
   }
 
   function updateReadyState(module) {
