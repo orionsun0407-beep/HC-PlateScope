@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-yaxis-label-fix";
+  const APP_VERSION = "2026-07-27-yaxis-ten-ceil";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -646,6 +646,11 @@
     return nice * (10 ** exponent);
   }
 
+  function ceilingToNearestTen(value) {
+    if (!Number.isFinite(value) || value <= 0) return 10;
+    return Math.max(10, Math.ceil(value / 10) * 10);
+  }
+
   function heatmapValues(summary, valueColumn) {
     return Object.fromEntries(summary.map((row) => [row.well_id || row.without_ca_well, row[valueColumn]]));
   }
@@ -695,7 +700,7 @@
     const padding = Number(yCfg.upper_padding || 1.1);
     const rawMax = Math.max(...ys);
     const padded = Number.isFinite(rawMax) && rawMax > 0 ? rawMax * padding : padding;
-    const ymax = normalized ? Math.max(padding, padded) : yCfg.rounding_mode === "raw" ? padded : niceUpperLimit(padded);
+    const ymax = normalized ? Math.max(padding, padded) : ceilingToNearestTen(padded);
     return {
       xmin: Math.min(...xs),
       xmax: Math.max(...xs),
