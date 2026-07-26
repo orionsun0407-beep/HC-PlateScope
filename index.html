@@ -1,19 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HC PlateScope</title>
-  <link rel="stylesheet" href="styles.css?v=2026-07-09-native7">
+  <link rel="stylesheet" href="styles.css?v=2026-07-26-pdf-plot-preview">
 </head>
 <body>
   <aside class="sidebar">
     <div class="hc-side-title">HC PlateScope</div>
-    <div class="hc-side-note">Local-first workspace<br>Runs stay in this browser<br>Version 2.0.0</div>
+    <div class="hc-side-note">浏览器本地计算<br>数据不会上传服务器<br>Version 2.0.1</div>
     <hr>
-    <label class="side-check"><input id="debugMode" type="checkbox"> Debug mode</label>
-    <p class="side-caption" id="currentWorkspace">Current workspace: Dashboard</p>
-    <p class="side-caption" id="latestRun">Latest run: none</p>
+    <label class="side-check"><input id="debugMode" type="checkbox"> 调试模式</label>
+    <p class="side-caption" id="currentWorkspace">当前工作区：仪表盘</p>
+    <p class="side-caption" id="latestRun">最近运行：无</p>
   </aside>
 
   <main class="main">
@@ -22,6 +22,10 @@
   </main>
 
   <div id="scratch" aria-hidden="true"></div>
-  <script src="native-app.js?v=2026-07-09-native7"></script>
+  <script src="app-core.js?v=2026-07-26-pdf-plot-preview"></script>
+  <script src="app-dashboard.js?v=2026-07-26-pdf-plot-preview"></script>
+  <script src="app-options.js?v=2026-07-26-pdf-plot-preview"></script>
+  <script src="app-init.js?v=2026-07-26-pdf-plot-preview"></script>
+  <script src="app-run.js?v=2026-07-26-pdf-plot-preview"></script>
 </body>
 </html>
