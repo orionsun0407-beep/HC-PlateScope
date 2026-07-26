@@ -8,12 +8,12 @@ Allowed differences:
 - Result preview displays the generated PDF in an iframe.
 
 Pages checked:
-- Dashboard: workspace cards, History card, Settings button, recent runs notice.
-- Module shell: Back to Dashboard, breadcrumb, module header, tags, data-mode pill.
-- Well ID: upload, detection settings, disabled recognition controls, run-name field, ready check, results.
-- GECO: 96/384 plate mode in Step 1, dynamic file upload mode, pairing rule, auto-standardization card, analysis settings, ready check, results.
-- LUCI: upload, auto-standardization card, fixed normalization, peak windows, analysis settings, ready check, results.
-- LSS: excitation/emission upload, raw data fixed control, auto-standardization card, analysis settings, ready check, results.
-- ANTI: excitation/emission upload, fixed column-max normalization, auto-standardization card, analysis settings, ready check, results.
+- Dashboard: top HC PlateScope hero, right-side 96-well layout panel, workspace cards, History card, Settings button, recent runs notice.
+- Module shell: clickable breadcrumb, module header, tags, data-mode pill, large card spacing.
+- Well ID: Streamlit-style uploader, detection settings, disabled recognition controls, run-name field, ready check, results.
+- GECO: 96/384 plate mode in Step 1, Streamlit-style full-width controls, dynamic dashed upload boxes, pairing rule, auto-standardization card, analysis settings, ready check, results.
+- LUCI: Streamlit-style uploader, auto-standardization card, fixed normalization, peak windows, analysis settings, ready check, results.
+- LSS: Streamlit-style excitation/emission upload boxes, raw data fixed control, auto-standardization card, analysis settings, ready check, results.
+- ANTI: Streamlit-style excitation/emission upload boxes, fixed column-max normalization, auto-standardization card, analysis settings, ready check, results.
 - History: filters, run list, metadata/folder/restore controls.
 - Settings: six tabs matching Streamlit sections, config.yaml export/import, save/reset controls.
