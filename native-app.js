@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-dragdrop-report-parity";
+  const APP_VERSION = "2026-07-27-heatmap-colorbar";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -838,12 +838,16 @@
     const cell = layout.format === 384 ? 24 : 34;
     const left = 48;
     const top = 58;
-    const width = left + cols.length * cell + 96;
+    const colorbar = { w: 14, gap: 30 };
+    const width = left + cols.length * cell + colorbar.gap + colorbar.w + 64;
     const height = top + rows.length * cell + 52;
     const finite = Object.values(values).map(Number).filter(Number.isFinite);
     const min = finite.length ? Math.min(...finite) : 0;
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
+    const barX = left + cols.length * cell + colorbar.gap;
+    const barY = top;
+    const barH = rows.length * cell - 1;
     let body = `<rect width="100%" height="100%" fill="white"/>
       <text x="${width / 2}" y="26" text-anchor="middle" font-size="18" font-weight="700" fill="#111">${esc(title)}</text>
       <text x="${width / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="#444">${esc(label)}</text>`;
@@ -860,6 +864,20 @@
         }
       });
     });
+    const segments = 80;
+    for (let i = 0; i < segments; i += 1) {
+      const t0 = i / segments;
+      const y0 = barY + barH - (i + 1) * barH / segments;
+      body += svgEl("rect", { x: barX, y: y0, width: colorbar.w, height: Math.ceil(barH / segments) + 0.4, fill: lerpColor(ramp, t0), stroke: "none" });
+    }
+    body += svgEl("rect", { x: barX, y: barY, width: colorbar.w, height: barH, fill: "none", stroke: "#555", "stroke-width": 0.45 });
+    const tickValues = [max, (min + max) / 2, min];
+    tickValues.forEach((value, idx) => {
+      const yTick = idx === 0 ? barY : idx === 1 ? barY + barH / 2 : barY + barH;
+      body += svgEl("line", { x1: barX + colorbar.w, y1: yTick, x2: barX + colorbar.w + 4, y2: yTick, stroke: "#444", "stroke-width": 0.45 });
+      body += svgEl("text", { x: barX + colorbar.w + 7, y: yTick + 3, "font-size": 7, fill: "#444" }, fmt(value, 2));
+    });
+    body += svgEl("text", { x: barX + colorbar.w / 2, y: barY + barH + 22, "text-anchor": "middle", "font-size": 8, fill: "#444" }, esc(label));
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
   }
 

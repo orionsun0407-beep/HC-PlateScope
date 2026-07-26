@@ -8,6 +8,7 @@ Allowed differences:
 - Result preview displays the generated PDF in an iframe.
 - Upload boxes support Streamlit-like click and drag/drop flows in the static browser build.
 - Combined report PDFs use an A4 portrait report layout instead of scaling one oversized SVG onto the page.
+- Heatmaps include a right-side colorbar with max/mid/min tick labels.
 
 Pages checked:
 - Dashboard: top HC PlateScope hero, right-side 96-well layout panel, workspace cards, History card, Settings button, recent runs notice.
