@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-heatmap-colorbar";
+  const APP_VERSION = "2026-07-27-vector-pdf";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -11,6 +11,7 @@
     papa: { url: "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js", test: () => window.Papa },
     zip: { url: "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js", test: () => window.JSZip },
     pdf: { url: "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js", test: () => window.jspdf },
+    svg2pdf: { url: "https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.3/dist/svg2pdf.umd.min.js", test: () => window.svg2pdf || window.jspdf?.jsPDF?.API?.svg },
     tiff: { url: "https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js", test: () => window.UTIF },
   };
   const libPromises = {};
@@ -1020,11 +1021,29 @@
     return { dataUrl: canvas.toDataURL("image/png"), canvas };
   }
 
-  async function svgToPdfBytes(svg, options = {}) {
+  async function ensureVectorPdfLibraries() {
     await loadScriptOnce("pdf");
+    await loadScriptOnce("svg2pdf");
+  }
+
+  async function drawSvgVector(pdf, svg, box) {
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    const svgElement = doc.documentElement;
+    if (pdf.svg) {
+      await pdf.svg(svgElement, box);
+      return;
+    }
+    if (window.svg2pdf) {
+      await window.svg2pdf(svgElement, pdf, box);
+      return;
+    }
+    throw new Error("Vector PDF renderer is unavailable.");
+  }
+
+  async function svgToPdfBytes(svg, options = {}) {
+    await ensureVectorPdfLibraries();
     const { jsPDF } = window.jspdf;
     const { width, height } = svgSize(svg);
-    const { dataUrl } = await svgToPngDataUrl(svg, 2);
     if (options.forcePortrait) {
       const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
       const pageWidth = 595.28;
@@ -1035,11 +1054,11 @@
       const imageHeight = height * scale;
       const x = (pageWidth - imageWidth) / 2;
       const y = (pageHeight - imageHeight) / 2;
-      pdf.addImage(dataUrl, "PNG", x, y, imageWidth, imageHeight);
+      await drawSvgVector(pdf, svg, { x, y, width: imageWidth, height: imageHeight });
       return pdf.output("arraybuffer");
     }
     const pdf = new jsPDF({ orientation: width > height ? "landscape" : "portrait", unit: "pt", format: [width, height] });
-    pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
+    await drawSvgVector(pdf, svg, { x: 0, y: 0, width, height });
     return pdf.output("arraybuffer");
   }
 
