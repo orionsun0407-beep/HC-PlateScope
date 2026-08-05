@@ -11,6 +11,7 @@ Allowed differences:
 - Heatmaps include a right-side colorbar with max/mid/min tick labels.
 - PDF exports are generated as vector PDFs from SVG, not rasterized PNG screenshots.
 - Combined report spacing is tightened so spectra panels and heatmaps print larger, with separate well ID and ratio badge placement.
+- Downloaded file names use date-project name-file type naming, such as 2026-08-06-Project-combined report.pdf.
 
 Pages checked:
 - Dashboard: top HC PlateScope hero, right-side 96-well layout panel, workspace cards, History card, Settings button, recent runs notice.

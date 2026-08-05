@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-05-report-density";
+  const APP_VERSION = "2026-08-06-export-filenames";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -1086,6 +1086,60 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  function safeFilenamePart(value) {
+    return String(value || "")
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .replace(/\s+/g, " ")
+      .slice(0, 90) || "untitled";
+  }
+
+  function resultDate(result) {
+    return String(result?.metadata?.timestamp || nowIso()).slice(0, 10);
+  }
+
+  function resultProjectName(result) {
+    return safeFilenamePart(result?.metadata?.run_name || result?.metadata?.module_type || result?.module || "HC PlateScope");
+  }
+
+  function extensionForPath(path) {
+    const name = String(path || "");
+    const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
+    return ext ? `.${ext}` : "";
+  }
+
+  function fileTypeForPath(path) {
+    const name = String(path || "").split("/").pop().replace(/\.[^.]+$/, "").toLowerCase();
+    const table = [
+      [/combined_report/, "combined report"],
+      [/grid_plots/, "grid plots"],
+      [/ratio_heatmap|peak_distance_heatmap|heatmap/, "heatmap"],
+      [/geco_peak_ratio/, "peak ratio"],
+      [/luci_normalized/, "normalized table"],
+      [/luci_peak_summary/, "peak summary"],
+      [/lss_peak_top10/, "top10 table"],
+      [/lss_summary/, "LSS summary"],
+      [/anti_excitation_normalized/, "excitation normalized table"],
+      [/anti_emission_normalized/, "emission normalized table"],
+      [/anti_summary/, "ANTI summary"],
+      [/standardized_by_well/, "standardized table"],
+      [/run_metadata/, "metadata"],
+      [/config_snapshot|config/, "config"],
+      [/processing_log/, "processing log"],
+    ];
+    const hit = table.find(([pattern]) => pattern.test(name));
+    return hit ? hit[1] : name.replace(/[_-]+/g, " ").trim() || "output";
+  }
+
+  function exportFilename(result, path, overrideType = "") {
+    const type = safeFilenamePart(overrideType || fileTypeForPath(path));
+    return `${resultDate(result)}-${resultProjectName(result)}-${type}${extensionForPath(path)}`;
+  }
+
+  function exportZipFilename(result, type = "outputs") {
+    return `${resultDate(result)}-${resultProjectName(result)}-${safeFilenamePart(type)}.zip`;
+  }
+
   async function buildOutputsZip(result) {
     await ensureZipLibrary();
     const zip = new JSZip();
@@ -1094,12 +1148,11 @@
     const report = zip.folder("report");
     for (const file of result.files) {
       const folder = file.path.startsWith("tables/") ? tables : file.path.startsWith("figures/") ? figures : file.path.startsWith("report/") ? report : zip;
-      const name = file.path.split("/").pop();
-      folder.file(name, file.bytes);
+      folder.file(exportFilename(result, file.path), file.bytes);
     }
-    zip.file("run_metadata.json", JSON.stringify(result.metadata, null, 2));
-    zip.file("config_snapshot.yaml", configToYaml(result.config));
-    zip.file("processing_log.txt", result.log.join("\n"));
+    zip.file(exportFilename(result, "run_metadata.json"), JSON.stringify(result.metadata, null, 2));
+    zip.file(exportFilename(result, "config_snapshot.yaml"), configToYaml(result.config));
+    zip.file(exportFilename(result, "processing_log.txt"), result.log.join("\n"));
     return zip.generateAsync({ type: "blob" });
   }
 
@@ -1733,18 +1786,18 @@
         <div class="hc-info-card hc-success"><strong>Analysis complete: ${esc(result.id)}</strong></div>
         ${kpis(result)}
         ${result.warnings.length ? `<div class="hc-info-card hc-warning"><strong>Warnings</strong>${result.warnings.map((w) => `<div>${esc(w)}</div>`).join("")}</div>` : ""}
-        <div class="actions"><button class="primary" id="downloadZip" type="button">Download outputs.zip</button></div>
-        <div class="download-grid">${downloads.map((file, idx) => `<button class="download-file" type="button" data-download-index="${idx}"><span>Download</span><strong>${esc(file.path.split("/").pop())}</strong><small>${esc(file.path)}</small></button>`).join("")}</div>
+        <div class="actions"><button class="primary" id="downloadZip" type="button">Download ${esc(exportZipFilename(result))}</button></div>
+        <div class="download-grid">${downloads.map((file, idx) => `<button class="download-file" type="button" data-download-index="${idx}"><span>Download</span><strong>${esc(exportFilename(result, file.path))}</strong><small>${esc(file.path)}</small></button>`).join("")}</div>
       </div>
       <div class="panel"><h2>${esc(summaryName)}</h2>${tableHtml(result.summary.slice(0, 100))}</div>
       ${selectedWellPanel(result)}
     `;
-    if ($("downloadReportPdf")) $("downloadReportPdf").addEventListener("click", () => downloadBlob(report.bytes, report.path.split("/").pop(), "application/pdf"));
-    $("downloadZip").addEventListener("click", async () => downloadBlob(await buildOutputsZip(result), `${result.id}_outputs.zip`, "application/zip"));
+    if ($("downloadReportPdf")) $("downloadReportPdf").addEventListener("click", () => downloadBlob(report.bytes, exportFilename(result, report.path), "application/pdf"));
+    $("downloadZip").addEventListener("click", async () => downloadBlob(await buildOutputsZip(result), exportZipFilename(result), "application/zip"));
     area.querySelectorAll("[data-download-index]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const file = downloads[Number(btn.dataset.downloadIndex)];
-        downloadBlob(file.bytes, file.path.split("/").pop(), mimeForPath(file.path));
+        downloadBlob(file.bytes, exportFilename(result, file.path), mimeForPath(file.path));
       });
     });
     wireSelectedWellPanel(result);
@@ -1811,11 +1864,11 @@
     const zip = new JSZip();
     const dpi = Number($("wellDpi").value || 600);
     for (const item of selectedWellSvgs(result)) {
-      if (format === "svg") zip.file(`${result.id}_${item.well}.svg`, item.svg);
-      if (format === "pdf") zip.file(`${result.id}_${item.well}.pdf`, await svgToPdfBytes(item.svg));
-      if (format === "tif") zip.file(`${result.id}_${item.well}.tif`, await svgToTiffBytes(item.svg, dpi));
+      if (format === "svg") zip.file(exportFilename(result, `${item.well}.svg`, `selected well ${item.well} plot`), item.svg);
+      if (format === "pdf") zip.file(exportFilename(result, `${item.well}.pdf`, `selected well ${item.well} plot`), await svgToPdfBytes(item.svg));
+      if (format === "tif") zip.file(exportFilename(result, `${item.well}.tif`, `selected well ${item.well} plot`), await svgToTiffBytes(item.svg, dpi));
     }
-    downloadBlob(await zip.generateAsync({ type: "blob" }), `${result.id}_selected_well_plots_${format}.zip`, "application/zip");
+    downloadBlob(await zip.generateAsync({ type: "blob" }), exportZipFilename(result, `selected well plots ${format}`), "application/zip");
   }
 
   async function downloadSelectedData(result) {
@@ -1829,9 +1882,9 @@
         series.tables.forEach((table, t) => { out[series.labels[t]] = table.rows[idx]?.[well]; });
         return out;
       });
-      zip.file(`${result.id}_${well}_plot_data.csv`, csvBytes(rows));
+      zip.file(exportFilename(result, `${well}.csv`, `selected well ${well} plot data`), csvBytes(rows));
     }
-    downloadBlob(await zip.generateAsync({ type: "blob" }), `${result.id}_selected_well_plot_data.zip`, "application/zip");
+    downloadBlob(await zip.generateAsync({ type: "blob" }), exportZipFilename(result, "selected well plot data"), "application/zip");
   }
 
   function renderHistory() {
@@ -1906,7 +1959,7 @@
       saveConfig();
       renderSettings();
     });
-    $("exportConfig").addEventListener("click", () => downloadBlob(new TextEncoder().encode(configToYaml(cfg)), "config.yaml", "text/yaml"));
+    $("exportConfig").addEventListener("click", () => downloadBlob(new TextEncoder().encode(configToYaml(cfg)), `${nowIso().slice(0, 10)}-HC PlateScope-config.yaml`, "text/yaml"));
     $("loadConfig").addEventListener("click", async () => {
       const file = $("importConfig").files[0];
       if (file) {
