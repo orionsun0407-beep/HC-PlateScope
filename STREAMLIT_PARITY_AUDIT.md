@@ -10,6 +10,7 @@ Allowed differences:
 - Combined report PDFs use an A4 portrait report layout instead of scaling one oversized SVG onto the page.
 - Heatmaps include a right-side colorbar with max/mid/min tick labels.
 - PDF exports are generated as vector PDFs from SVG, not rasterized PNG screenshots.
+- Combined report spacing is tightened so spectra panels and heatmaps print larger, with separate well ID and ratio badge placement.
 
 Pages checked:
 - Dashboard: top HC PlateScope hero, right-side 96-well layout panel, workspace cards, History card, Settings button, recent runs notice.

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-07-27-vector-pdf";
+  const APP_VERSION = "2026-08-05-report-density";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -719,7 +719,7 @@
 
   function wellPanelSvg({ tables, labels, colors, well, title, x, y, width, height, smooth = true, windowLength = 9, badge, config = DEFAULT_CONFIG, normalized = false, moduleKey = "" }) {
     const compact = width < 80 || height < 80;
-    const pad = compact ? { l: 13, r: 4, t: 8, b: 15 } : { l: 32, r: 10, t: 18, b: 36 };
+    const pad = compact ? { l: 12, r: 3, t: 9, b: 12 } : { l: 32, r: 10, t: 18, b: 36 };
     const innerW = width - pad.l - pad.r;
     const innerH = height - pad.t - pad.b;
     const range = seriesRange(tables[0], [well], config, normalized);
@@ -736,8 +736,8 @@
     }
     const sx = (v) => x + pad.l + ((v - range.xmin) / Math.max(1e-9, range.xmax - range.xmin)) * innerW;
     const sy = (v) => y + pad.t + innerH - ((v - range.ymin) / Math.max(1e-9, range.ymax - range.ymin)) * innerH;
-    const markerRadius = compact ? Math.max(0.28, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.32) : Math.max(0.75, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.7);
-    const lineWidth = compact ? Math.max(0.28, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 0.42) : Math.max(0.6, Number(config.plot?.line_width || config.plotting?.line_width || 1));
+    const markerRadius = compact ? Math.max(0.34, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.38) : Math.max(0.75, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.7);
+    const lineWidth = compact ? Math.max(0.34, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 0.5) : Math.max(0.6, Number(config.plot?.line_width || config.plotting?.line_width || 1));
     const markerAlpha = Number(config.plot?.marker_alpha || config.plotting?.alpha || 0.55);
     const lineAlpha = Number(config.plot?.line_alpha || config.plotting?.line_alpha || 0.95);
     const grid = [];
@@ -772,20 +772,24 @@
       const d = pts.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(2)} ${sy(yValues[i]).toFixed(2)}`).join(" ");
       plots.push(svgEl("path", { d, fill: "none", stroke: colors[idx], "stroke-width": lineWidth.toFixed(2), opacity: lineAlpha }));
     });
-    const badgeW = compact ? 16 : 40;
+    const badgeW = compact ? 18 : 40;
     const badgeH = compact ? 6 : 14;
-    const badgeSvg = badge ? svgEl("rect", { x: x + width - badgeW - (compact ? 3 : 8), y: y + (compact ? 7 : 18), width: badgeW, height: badgeH, rx: compact ? 1.2 : 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
-      svgEl("text", { x: x + width - badgeW / 2 - (compact ? 3 : 8), y: y + (compact ? 11.4 : 28.5), "text-anchor": "middle", "font-size": compact ? 3.2 : 7.2, "font-weight": "700", fill: "white" }, badge.text) : "";
-    const titleAttrs = moduleKey === "geco"
-      ? { x: x + width - 8, y: y + 12, "text-anchor": "end" }
-      : { x: x + 8, y: y + 12, "text-anchor": "start" };
+    const badgeX = x + width - badgeW - (compact ? 2 : 8);
+    const badgeY = y + (compact ? 1.5 : 18);
+    const badgeSvg = badge ? svgEl("rect", { x: badgeX, y: badgeY, width: badgeW, height: badgeH, rx: compact ? 1.2 : 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
+      svgEl("text", { x: badgeX + badgeW / 2, y: badgeY + (compact ? 4.4 : 10.5), "text-anchor": "middle", "font-size": compact ? 3.2 : 7.2, "font-weight": "700", fill: "white" }, badge.text) : "";
+    const titleAttrs = compact
+      ? { x: x + 3, y: y + 5.2, "text-anchor": "start" }
+      : moduleKey === "geco"
+        ? { x: x + width - 8, y: y + 12, "text-anchor": "end" }
+        : { x: x + 8, y: y + 12, "text-anchor": "start" };
     return svgEl("g", {}, [
       svgEl("rect", { x, y, width, height, fill: "white" }),
       ...grid,
       svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.35 : 0.75 }),
       svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.35 : 0.75 }),
       ...plots,
-      svgEl("text", { ...titleAttrs, "font-size": compact ? 3.8 : 8, "font-weight": "700", fill: "#333" }, title || well),
+      svgEl("text", { ...titleAttrs, "font-size": compact ? 4.2 : 8, "font-weight": "700", fill: "#333" }, title || well),
       badgeSvg,
     ].join(""));
   }
@@ -794,14 +798,14 @@
     const layout = config.plotting.spectra_grid || {};
     const ncols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plateLayout(config, wells).cols.length;
     const pageWells = wells.slice();
-    const panelW = report ? 44 : 128;
-    const panelH = report ? 54 : 100;
-    const gap = report ? 5 : 14;
+    const panelW = report ? 48 : 128;
+    const panelH = report ? 57 : 100;
+    const gap = report ? 1.5 : 14;
     const rows = Math.ceil(pageWells.length / ncols);
-    const left = report ? 12 : 22;
-    const top = report ? 27 : 48;
-    const width = (report ? 24 : 42) + ncols * panelW + (ncols - 1) * gap;
-    const height = (report ? 42 : 74) + rows * panelH + (rows - 1) * gap;
+    const left = report ? 4 : 22;
+    const top = report ? 18 : 48;
+    const width = left * 2 + ncols * panelW + (ncols - 1) * gap;
+    const height = top + rows * panelH + (rows - 1) * gap + (report ? 10 : 26);
     const colors = [config.plotting.colors.primary, config.plotting.colors.secondary];
     const panels = pageWells.map((well, idx) => {
       const col = idx % ncols;
@@ -826,9 +830,9 @@
     }).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="${report ? 13 : 24}" text-anchor="middle" font-size="${report ? 9 : 18}" font-weight="700" fill="#111">${esc(title)}</text>
+      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-size="${report ? 8 : 18}" font-weight="700" fill="#111">${esc(title)}</text>
       ${panels}
-      <text x="${width / 2}" y="${height - (report ? 3 : 10)}" text-anchor="middle" font-size="${report ? 4.8 : 10}" fill="#444">Wavelength (nm)</text>
+      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${report ? 5 : 10}" fill="#444">Wavelength (nm)</text>
     </svg>`;
   }
 
@@ -887,16 +891,16 @@
     const heatBox = svgSize(heatmap);
     const width = 595.28;
     const height = 841.89;
-    const marginX = 34;
-    const gridRegion = { x: marginX, y: 58, width: width - marginX * 2, height: 360 };
-    const heatRegion = { x: 116, y: 506, width: width - 232, height: 250 };
+    const marginX = 18;
+    const gridRegion = { x: marginX, y: 38, width: width - marginX * 2, height: 500 };
+    const heatRegion = { x: 42, y: 552, width: width - 84, height: 280 };
     const gridScale = Math.min(gridRegion.width / gridBox.width, gridRegion.height / gridBox.height);
     const heatScale = Math.min(heatRegion.width / heatBox.width, heatRegion.height / heatBox.height);
     const gridX = gridRegion.x + (gridRegion.width - gridBox.width * gridScale) / 2;
     const heatX = heatRegion.x + (heatRegion.width - heatBox.width * heatScale) / 2;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="32" text-anchor="middle" font-size="11" font-weight="700" fill="#111">${esc(title)}</text>
+      <text x="${width / 2}" y="24" text-anchor="middle" font-size="10" font-weight="700" fill="#111">${esc(title)}</text>
       <g transform="translate(${gridX.toFixed(2)} ${gridRegion.y}) scale(${gridScale.toFixed(5)})">${stripSvg(grid)}</g>
       <g transform="translate(${heatX.toFixed(2)} ${heatRegion.y}) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
     </svg>`;
