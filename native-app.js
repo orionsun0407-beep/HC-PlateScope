@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-06-export-filenames";
+  const APP_VERSION = "2026-08-06-luci-ymax";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -686,7 +686,7 @@
     return `<${tag}${attr}>${body}</${tag}>`;
   }
 
-  function seriesRange(table, wells, config = DEFAULT_CONFIG, normalized = false) {
+  function seriesRange(table, wells, config = DEFAULT_CONFIG, normalized = false, moduleKey = "") {
     const xs = table.rows.map((r) => asNum(r.Wavelength)).filter(Number.isFinite);
     const ys = [];
     for (const row of table.rows) for (const well of wells) {
@@ -696,8 +696,7 @@
     const yCfg = config.plotting?.y_axis || {};
     const padding = Number(yCfg.upper_padding || 1.1);
     const rawMax = Math.max(...ys);
-    const padded = Number.isFinite(rawMax) && rawMax > 0 ? rawMax * padding : padding;
-    const ymax = ceilingToNearestTen(padded);
+    const ymax = ["luci", "anti"].includes(moduleKey) ? 1.1 : ceilingToNearestTen(Number.isFinite(rawMax) && rawMax > 0 ? rawMax * padding : padding);
     return {
       xmin: Math.min(...xs),
       xmax: Math.max(...xs),
@@ -722,9 +721,9 @@
     const pad = compact ? { l: 12, r: 3, t: 9, b: 12 } : { l: 32, r: 10, t: 18, b: 36 };
     const innerW = width - pad.l - pad.r;
     const innerH = height - pad.t - pad.b;
-    const range = seriesRange(tables[0], [well], config, normalized);
+    const range = seriesRange(tables[0], [well], config, normalized, moduleKey);
     for (const table of tables.slice(1)) {
-      const r = seriesRange(table, [well], config, normalized);
+      const r = seriesRange(table, [well], config, normalized, moduleKey);
       range.ymax = Math.max(range.ymax, r.ymax);
     }
     const allX = tables.flatMap((table) => table.rows.map((row) => row.Wavelength));
