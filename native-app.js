@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-07-color-inputs";
+  const APP_VERSION = "2026-08-07-pdf-preview-xlsx";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -137,7 +137,6 @@
     history: loadHistory(),
     debug: false,
     reportZoom: 1,
-    reportPreviewUrl: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -989,6 +988,11 @@
     return XLSX.write(wb, { bookType: "xlsx", type: "array" });
   }
 
+  function rowsToXlsxBytes(rows, sheetName = "Sheet1") {
+    const columns = Object.keys(rows[0] || {});
+    return tableToXlsxBytes({ columns, rows }, sheetName);
+  }
+
   function workbookToXlsxBytes(sheets) {
     const wb = XLSX.utils.book_new();
     for (const sheet of sheets) {
@@ -1344,7 +1348,7 @@
     const reportGrid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true });
     const heatSvg = heatmapSvg(heat, config, is384 ? "GECO 384 paired max(with CA) / max(without CA)" : "GECO max(with ca) / max(without ca)", "ratio");
     const reportSvg = combineReportSvg(is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap", reportGrid, heatSvg);
-    const files = [{ path: "tables/GECO_peak_ratio.csv", bytes: csvBytes(summary) }];
+    const files = [{ path: "tables/GECO_peak_ratio.xlsx", bytes: rowsToXlsxBytes(summary, "peak_ratio") }];
     await addFigureFiles(files, "figures/GECO_grid_plots", grid);
     await addFigureFiles(files, "figures/GECO_heatmap", heatSvg);
     await addFigureFiles(files, "report/GECO_combined_report", reportSvg);
@@ -1370,7 +1374,7 @@
     const reportSvg = combineReportSvg("LUCI spectra and 520/450 ratio heatmap", reportGrid, heatSvg);
     const files = [
       { path: "tables/LUCI_normalized.xlsx", bytes: tableToXlsxBytes(norm, "normalized") },
-      { path: "tables/LUCI_peak_summary.csv", bytes: csvBytes(summary) },
+      { path: "tables/LUCI_peak_summary.xlsx", bytes: rowsToXlsxBytes(summary, "peak_summary") },
     ];
     await addFigureFiles(files, "figures/LUCI_grid_plots", grid);
     await addFigureFiles(files, "figures/LUCI_ratio_heatmap", heatSvg);
@@ -1407,7 +1411,7 @@
     const reportSvg = combineReportSvg("LSS raw spectra and Stokes shift heatmap", reportGrid, heatSvg);
     const columns = Object.keys(summary[0] || {});
     const files = [
-      { path: "tables/LSS_summary.csv", bytes: csvBytes(summary) },
+      { path: "tables/LSS_summary.xlsx", bytes: rowsToXlsxBytes(summary, "LSS_summary") },
       {
         path: "tables/LSS_peak_top10.xlsx",
         bytes: workbookToXlsxBytes([
@@ -1444,7 +1448,7 @@
     const files = [
       { path: "tables/anti_excitation_normalized.xlsx", bytes: tableToXlsxBytes(excitationNorm.table, "normalized") },
       { path: "tables/anti_emission_normalized.xlsx", bytes: tableToXlsxBytes(emissionNorm.table, "normalized") },
-      { path: "tables/anti_summary.csv", bytes: csvBytes(summary) },
+      { path: "tables/anti_summary.xlsx", bytes: rowsToXlsxBytes(summary, "anti_summary") },
     ];
     await addFigureFiles(files, "figures/anti_grid_plots", grid);
     await addFigureFiles(files, "report/anti_combined_report", grid);
@@ -1829,21 +1833,44 @@
     }
   }
 
+  function reportPreviewHtml(report) {
+    const svg = report.previewSvg || `<div class="hc-info-card hc-warning">Report preview is unavailable. Please use the download button.</div>`;
+    return `<div class="panel pdf-preview"><div class="pdf-toolbar"><h2>Report preview</h2><div class="pdf-zoom-controls"><button type="button" id="pdfZoomOut" title="Zoom out">−</button><button type="button" id="pdfZoomReset" title="Reset zoom">100%</button><button type="button" id="pdfZoomIn" title="Zoom in">+</button><button type="button" id="downloadReportPdf">Download report PDF</button></div></div><div class="pdf-frame-shell" id="reportPreviewShell" tabindex="0" aria-label="Report preview. Use Command plus and Command minus to zoom the report preview only."><div class="pdf-frame" id="reportPreviewFrame">${svg}</div></div></div>`;
+  }
+
+  function wireReportPreview(result, report) {
+    const shell = $("reportPreviewShell");
+    const frame = $("reportPreviewFrame");
+    const setZoom = (value) => {
+      state.reportZoom = Math.min(3, Math.max(0.45, Number(value) || 1));
+      if (frame) frame.style.setProperty("--preview-zoom", state.reportZoom);
+      if ($("pdfZoomReset")) $("pdfZoomReset").textContent = `${Math.round(state.reportZoom * 100)}%`;
+    };
+    setZoom(state.reportZoom || 1);
+    $("pdfZoomOut")?.addEventListener("click", () => setZoom(state.reportZoom - 0.15));
+    $("pdfZoomIn")?.addEventListener("click", () => setZoom(state.reportZoom + 0.15));
+    $("pdfZoomReset")?.addEventListener("click", () => setZoom(1));
+    $("downloadReportPdf")?.addEventListener("click", () => downloadBlob(report.bytes, exportFilename(result, report.path), "application/pdf"));
+    shell?.addEventListener("click", () => shell.focus());
+    shell?.addEventListener("keydown", (event) => {
+      const key = event.key;
+      if (!(event.metaKey || event.ctrlKey) || !["+", "=", "-", "_", "0"].includes(key)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (key === "0") setZoom(1);
+      else if (key === "-" || key === "_") setZoom(state.reportZoom - 0.15);
+      else setZoom(state.reportZoom + 0.15);
+    });
+  }
+
   function renderResult(result) {
     const area = $("resultArea");
     const report = result.files.find((file) => file.path.includes("combined_report") && file.path.endsWith(".pdf"));
-    if (state.reportPreviewUrl) {
-      URL.revokeObjectURL(state.reportPreviewUrl);
-      state.reportPreviewUrl = null;
-    }
-    if (report) {
-      state.reportPreviewUrl = URL.createObjectURL(new Blob([report.bytes], { type: "application/pdf" }));
-    }
     const downloads = resultDownloadFiles(result);
     const summaryName = result.module === "wellid" ? "Preview table" : result.module === "geco" ? "Peak ratio preview" : result.module === "luci" ? "Peak summary preview" : result.module === "lss" ? "LSS summary preview" : "Normalization summary preview";
     area.innerHTML = `
       ${step(4, "Results & downloads", "Inspect summary, warnings, previews, and local output files.")}
-      ${report ? `<div class="panel"><div class="pdf-toolbar"><h2>Report preview</h2><div class="actions"><button type="button" id="downloadReportPdf">Download report PDF</button></div></div><iframe class="hc-pdf-preview hc-pdf-iframe" src="${state.reportPreviewUrl}#toolbar=1&navpanes=0&scrollbar=1" title="Report preview"></iframe></div>` : ""}
+      ${report ? reportPreviewHtml(report) : ""}
       <div class="panel">
         <div class="hc-info-card hc-success"><strong>Analysis complete: ${esc(result.id)}</strong></div>
         ${kpis(result)}
@@ -1854,7 +1881,7 @@
       <div class="panel"><h2>${esc(summaryName)}</h2>${tableHtml(result.summary.slice(0, 100))}</div>
       ${selectedWellPanel(result)}
     `;
-    if ($("downloadReportPdf")) $("downloadReportPdf").addEventListener("click", () => downloadBlob(report.bytes, exportFilename(result, report.path), "application/pdf"));
+    if (report) wireReportPreview(result, report);
     $("downloadZip").addEventListener("click", async () => downloadBlob(await buildOutputsZip(result), exportZipFilename(result), "application/zip"));
     area.querySelectorAll("[data-download-index]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1944,7 +1971,7 @@
         series.tables.forEach((table, t) => { out[series.labels[t]] = table.rows[idx]?.[well]; });
         return out;
       });
-      zip.file(exportFilename(result, `${well}.csv`, `selected well ${well} plot data`), csvBytes(rows));
+      zip.file(exportFilename(result, `${well}.xlsx`, `selected well ${well} plot data`), rowsToXlsxBytes(rows, well));
     }
     downloadBlob(await zip.generateAsync({ type: "blob" }), exportZipFilename(result, "selected well plot data"), "application/zip");
   }

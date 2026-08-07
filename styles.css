@@ -418,9 +418,21 @@ th { position: sticky; top: 0; background: #F7FAF8; color: var(--hc-green); z-in
 }
 .pdf-frame {
   display: block;
+  width: max(980px, calc(100% * var(--preview-zoom, 1)));
+  max-width: none;
+  margin: 0 auto;
   border: 0;
   background: #FFFFFF;
   box-shadow: 0 8px 22px rgba(31, 42, 36, 0.12);
+}
+.pdf-frame svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.pdf-frame-shell:focus {
+  outline: 2px solid rgba(107, 183, 168, 0.55);
+  outline-offset: -2px;
 }
 .file-list { list-style: none; padding: 0; margin: 0.5rem 0; }
 .file-list li { padding: 0.45rem 0; border-bottom: 1px solid #EEF3F0; color: var(--hc-muted); font-size: 0.86rem; display: flex; justify-content: space-between; gap: 1rem; }
