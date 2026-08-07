@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-07-color-controls";
+  const APP_VERSION = "2026-08-07-palette-menu";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -689,13 +689,10 @@
     return colorRamp(name).join(", ");
   }
 
-  function paletteOptionText(palette) {
-    return `${palette.name.padEnd(13, " ")}  █████`;
-  }
-
   function paletteSelect(id, value) {
-    const options = HEATMAP_PALETTES.map((palette) => `<option value="${esc(palette.id)}" ${palette.id === value ? "selected" : ""}>${esc(paletteOptionText(palette))}</option>`).join("");
-    return `<div class="palette-select-wrap"><select id="${id}" data-palette-select>${options}</select><span class="palette-bar" data-palette-preview="${id}" style="background: linear-gradient(90deg, ${esc(paletteGradient(value))})"></span></div>`;
+    const current = HEATMAP_PALETTES.find((palette) => palette.id === value) || HEATMAP_PALETTES[0];
+    const options = HEATMAP_PALETTES.map((palette) => `<button class="palette-option${palette.id === current.id ? " selected" : ""}" type="button" data-palette-value="${esc(palette.id)}"><span>${esc(palette.name)}</span><i style="background: linear-gradient(90deg, ${esc(palette.colors.join(", "))})"></i></button>`).join("");
+    return `<div class="palette-select-wrap" data-palette-root><input id="${id}" type="hidden" value="${esc(current.id)}" data-palette-input><button class="palette-trigger" type="button" data-palette-trigger aria-haspopup="listbox" aria-expanded="false"><span data-palette-name>${esc(current.name)}</span><i data-palette-preview style="background: linear-gradient(90deg, ${esc(current.colors.join(", "))})"></i></button><div class="palette-menu" data-palette-menu role="listbox">${options}</div></div>`;
   }
 
   function colorSelect(id, value) {
@@ -706,14 +703,44 @@
   }
 
   function wireVisualSelects(root = document) {
-    root.querySelectorAll("[data-palette-select]").forEach((select) => {
-      const update = () => {
-        const preview = root.querySelector(`[data-palette-preview="${select.id}"]`);
-        if (preview) preview.style.background = `linear-gradient(90deg, ${paletteGradient(select.value)})`;
+    root.querySelectorAll("[data-palette-root]").forEach((picker) => {
+      const input = picker.querySelector("[data-palette-input]");
+      const trigger = picker.querySelector("[data-palette-trigger]");
+      const menu = picker.querySelector("[data-palette-menu]");
+      const name = picker.querySelector("[data-palette-name]");
+      const preview = picker.querySelector("[data-palette-preview]");
+      const close = () => {
+        picker.classList.remove("open");
+        trigger?.setAttribute("aria-expanded", "false");
       };
-      select.addEventListener("change", update);
-      update();
+      const update = (value) => {
+        const palette = HEATMAP_PALETTES.find((item) => item.id === value) || HEATMAP_PALETTES[0];
+        input.value = palette.id;
+        if (name) name.textContent = palette.name;
+        if (preview) preview.style.background = `linear-gradient(90deg, ${palette.colors.join(", ")})`;
+        picker.querySelectorAll("[data-palette-value]").forEach((btn) => btn.classList.toggle("selected", btn.dataset.paletteValue === palette.id));
+      };
+      trigger?.addEventListener("click", () => {
+        const isOpen = picker.classList.toggle("open");
+        trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      });
+      menu?.querySelectorAll("[data-palette-value]").forEach((btn) => btn.addEventListener("click", () => {
+        update(btn.dataset.paletteValue);
+        close();
+      }));
+      update(input.value);
     });
+    if (!window.__hcPaletteOutsideClick) {
+      window.__hcPaletteOutsideClick = true;
+      document.addEventListener("click", (event) => {
+        document.querySelectorAll("[data-palette-root].open").forEach((picker) => {
+          if (!picker.contains(event.target)) {
+            picker.classList.remove("open");
+            picker.querySelector("[data-palette-trigger]")?.setAttribute("aria-expanded", "false");
+          }
+        });
+      });
+    }
     root.querySelectorAll("[data-color-select]").forEach((select) => {
       const update = () => {
         const preview = root.querySelector(`[data-color-preview="${select.id}"]`);
