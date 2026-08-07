@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-06-luci-ymax";
+  const APP_VERSION = "2026-08-07-color-controls";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -15,6 +15,35 @@
     tiff: { url: "https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js", test: () => window.UTIF },
   };
   const libPromises = {};
+
+
+  const HEATMAP_PALETTES = [
+    { id: "hc_nature", name: "HC nature", colors: ["#F7FBF8", "#DDF3DE", "#AADCA9", "#3775BA", "#B64342"] },
+    { id: "hc_soft", name: "HC soft", colors: ["#F8FBF8", "#DDEFE8", "#9FD1C4", "#5F9FBE", "#E6A15C"] },
+    { id: "YlGnBu", name: "YlGnBu", colors: ["#ffffd9", "#c7e9b4", "#41b6c4", "#225ea8"] },
+    { id: "BuGn", name: "BuGn", colors: ["#f7fcfd", "#ccece6", "#66c2a4", "#238b45"] },
+    { id: "viridis", name: "viridis", colors: ["#440154", "#31688e", "#35b779", "#fde725"] },
+    { id: "cividis", name: "cividis", colors: ["#00224e", "#575d6d", "#a59c74", "#fee838"] },
+    { id: "plasma", name: "plasma", colors: ["#0d0887", "#9c179e", "#ed7953", "#f0f921"] },
+    { id: "mako", name: "mako", colors: ["#0B0405", "#264A6A", "#4C99A6", "#DEF5E5"] },
+    { id: "rocket", name: "rocket", colors: ["#03051A", "#7B1F59", "#D64F40", "#FAEBDD"] },
+    { id: "crest", name: "crest", colors: ["#173F5F", "#2C7C7B", "#8FD0A9", "#F5F7D4"] },
+    { id: "coolwarm", name: "coolwarm", colors: ["#3B4CC0", "#89A9FC", "#F7F7F7", "#F4987A", "#B40426"] },
+    { id: "magma", name: "magma", colors: ["#000004", "#3B0F70", "#8C2981", "#DE4968", "#FCFDBF"] },
+  ];
+
+  const COLOR_PRESETS = [
+    { id: "#0F4D92", name: "Deep blue" },
+    { id: "#8BCF8B", name: "Fresh green" },
+    { id: "#42949E", name: "Teal ratio" },
+    { id: "#9A4D8E", name: "LUCI purple" },
+    { id: "#B64342", name: "Scientific red" },
+    { id: "#E28E2C", name: "Amber" },
+    { id: "#2F5D50", name: "Forest green" },
+    { id: "#4C78A8", name: "Calm blue" },
+    { id: "#6BB7A8", name: "Mint teal" },
+    { id: "#8E7DBE", name: "Soft violet" },
+  ];
 
   const DEFAULT_CONFIG = {
     project: { name: "HC PlateScope", version: "1.0.0" },
@@ -653,16 +682,46 @@
   }
 
   function colorRamp(name) {
-    const ramps = {
-      hc_soft: ["#F8FBF8", "#DDEFE8", "#9FD1C4", "#5F9FBE", "#E6A15C"],
-      hc_nature: ["#F7FBF8", "#DDF3DE", "#AADCA9", "#3775BA", "#B64342"],
-      YlGnBu: ["#ffffd9", "#c7e9b4", "#41b6c4", "#225ea8"],
-      BuGn: ["#f7fcfd", "#ccece6", "#66c2a4", "#238b45"],
-      viridis: ["#440154", "#31688e", "#35b779", "#fde725"],
-      cividis: ["#00224e", "#575d6d", "#a59c74", "#fee838"],
-      plasma: ["#0d0887", "#9c179e", "#ed7953", "#f0f921"],
-    };
-    return ramps[name] || ramps.hc_nature;
+    return HEATMAP_PALETTES.find((palette) => palette.id === name)?.colors || HEATMAP_PALETTES[0].colors;
+  }
+
+  function paletteGradient(name) {
+    return colorRamp(name).join(", ");
+  }
+
+  function paletteOptionText(palette) {
+    return `${palette.name.padEnd(13, " ")}  █████`;
+  }
+
+  function paletteSelect(id, value) {
+    const options = HEATMAP_PALETTES.map((palette) => `<option value="${esc(palette.id)}" ${palette.id === value ? "selected" : ""}>${esc(paletteOptionText(palette))}</option>`).join("");
+    return `<div class="palette-select-wrap"><select id="${id}" data-palette-select>${options}</select><span class="palette-bar" data-palette-preview="${id}" style="background: linear-gradient(90deg, ${esc(paletteGradient(value))})"></span></div>`;
+  }
+
+  function colorSelect(id, value) {
+    const known = COLOR_PRESETS.some((color) => color.id.toLowerCase() === String(value).toLowerCase());
+    const options = COLOR_PRESETS.map((color) => `<option value="${esc(color.id)}" ${color.id.toLowerCase() === String(value).toLowerCase() ? "selected" : ""}>${esc(color.name)}</option>`).join("");
+    const custom = known ? "" : `<option value="${esc(value)}" selected>Custom</option>`;
+    return `<div class="color-select-wrap"><select id="${id}" data-color-select>${options}${custom}</select><span class="color-bar" data-color-preview="${id}" style="background: ${esc(value)}"></span></div>`;
+  }
+
+  function wireVisualSelects(root = document) {
+    root.querySelectorAll("[data-palette-select]").forEach((select) => {
+      const update = () => {
+        const preview = root.querySelector(`[data-palette-preview="${select.id}"]`);
+        if (preview) preview.style.background = `linear-gradient(90deg, ${paletteGradient(select.value)})`;
+      };
+      select.addEventListener("change", update);
+      update();
+    });
+    root.querySelectorAll("[data-color-select]").forEach((select) => {
+      const update = () => {
+        const preview = root.querySelector(`[data-color-preview="${select.id}"]`);
+        if (preview) preview.style.background = select.value;
+      };
+      select.addEventListener("change", update);
+      update();
+    });
   }
 
   function hexToRgb(hex) {
@@ -1493,6 +1552,7 @@
       <form id="runForm">${moduleBody(module)}</form>
       <section id="resultArea"></section>`;
     $("workspace").querySelector("[data-back]").addEventListener("click", renderDashboard);
+    wireVisualSelects($("workspace"));
     wireModuleControls(module);
     $("runForm").addEventListener("submit", onRunSubmit);
     updateSide();
@@ -1570,10 +1630,10 @@
             <div><label>Line alpha</label><input id="${module}_lalpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.line_alpha}"></div>
             <label class="check"><input id="${module}_nice" type="checkbox" checked> Nice rounding enabled</label>
           </div>
-          <div class="settings-group">
-            <div><label>${esc(colorA)}</label><input id="${module}_primary" type="color" value="${cfg.plotting.colors.primary}"></div>
-            <div><label>${esc(colorB)}</label><input id="${module}_secondary" type="color" value="${cfg.plotting.colors.secondary}"></div>
-            ${includeHeatmap ? `<div><label>Heatmap colormap</label><select id="${module}_cmap"><option>hc_nature</option><option>hc_soft</option><option>YlGnBu</option><option>BuGn</option><option>viridis</option><option>cividis</option><option>plasma</option></select></div><div><label>Low percentile</label><input id="${module}_robust_low" type="number" min="0" max="20" value="5"></div><div><label>High percentile</label><input id="${module}_robust_high" type="number" min="80" max="100" value="95"></div>` : ""}
+          <div class="settings-group color-settings-group">
+            <div><label>${esc(colorA)}</label>${colorSelect(`${module}_primary`, cfg.plotting.colors.primary)}</div>
+            <div><label>${esc(colorB)}</label>${colorSelect(`${module}_secondary`, cfg.plotting.colors.secondary)}</div>
+            ${includeHeatmap ? `<div><label>Heatmap colormap</label>${paletteSelect(`${module}_cmap`, cfg.plotting.colors.heatmap)}</div>${["geco", "luci"].includes(module) ? `<div><label>Ratio badge color</label>${colorSelect(`${module}_ratio_badge`, module === "luci" ? cfg.plotting.badges.luci_ratio : cfg.plotting.badges.geco_ratio)}</div>` : ""}<div><label>Low percentile</label><input id="${module}_robust_low" type="number" min="0" max="20" value="5"></div><div><label>High percentile</label><input id="${module}_robust_high" type="number" min="80" max="100" value="95"></div>` : ""}
           </div>
         </details>
         <div class="settings-group single">${controlField("Project name for this run", `<input id="${module}_run_name" value="${esc(`${module === "wellid" ? "Well ID" : MODULES[module].title.split(" ")[0]} ${new Date().toISOString().slice(0, 10)}`)}">`)}</div>
@@ -1727,6 +1787,10 @@
     if ($(`${module}_heat_vals`)) cfg.plotting.heatmap.show_values = getChecked(`${module}_heat_vals`);
     if ($(`${module}_robust`)) cfg.plotting.heatmap.robust_scaling = getChecked(`${module}_robust`);
     if ($(`${module}_cmap`)) cfg.plotting.colors.heatmap = $(`${module}_cmap`).value;
+    if ($(`${module}_ratio_badge`)) {
+      if (module === "luci") cfg.plotting.badges.luci_ratio = $(`${module}_ratio_badge`).value;
+      else cfg.plotting.badges.geco_ratio = $(`${module}_ratio_badge`).value;
+    }
     if ($(`${module}_robust_low`)) cfg.plotting.heatmap.robust_lower_percentile = Number($(`${module}_robust_low`).value || 5);
     if ($(`${module}_robust_high`)) cfg.plotting.heatmap.robust_upper_percentile = Number($(`${module}_robust_high`).value || 95);
     if (module === "luci") {
@@ -1920,14 +1984,14 @@
     $("currentWorkspace").textContent = "Current workspace: Settings";
     $("workspace").innerHTML = `<div class="hc-breadcrumb" data-back>Dashboard / Settings</div><div class="hc-module-header"><div><h1>Settings</h1><p>Set global default plotting, smoothing, output, and history parameters.</p><div class="hc-tags"><span class="hc-tag">Defaults</span><span class="hc-tag">config.yaml</span><span class="hc-tag">Local</span></div></div><div class="hc-mode-pill"><span>Data mode</span><strong>Session settings</strong></div></div>
       <div class="tabs" id="settingsTabs">${["Plot style", "Smoothing", "Y-axis", "Output", "History", "Import / Export"].map((tab, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-tab="${i}">${esc(tab)}</button>`).join("")}</div>
-      <div class="panel tab-panel" data-panel="0"><div class="grid three"><div><label>Marker size</label><input id="set_marker" type="range" min="0.5" max="8" step="0.5" value="${cfg.plot.marker_size}"></div><div><label>Line width</label><input id="set_line" type="range" min="0.2" max="3" step="0.1" value="${cfg.plot.line_width}"></div><div><label>Font family</label><input id="set_font" value="${esc(cfg.plotting.font_family || "Arial")}"></div><div><label>Marker alpha</label><input id="set_malpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.marker_alpha}"></div><div><label>Line alpha</label><input id="set_lalpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.line_alpha}"></div><div><label>Default heatmap palette</label><select id="set_cmap"><option>hc_soft</option><option>YlGnBu</option><option>BuGn</option><option>viridis</option><option>cividis</option><option>plasma</option></select></div></div></div>
+      <div class="panel tab-panel" data-panel="0"><div class="grid three"><div><label>Marker size</label><input id="set_marker" type="range" min="0.5" max="8" step="0.5" value="${cfg.plot.marker_size}"></div><div><label>Line width</label><input id="set_line" type="range" min="0.2" max="3" step="0.1" value="${cfg.plot.line_width}"></div><div><label>Font family</label><input id="set_font" value="${esc(cfg.plotting.font_family || "Arial")}"></div><div><label>Marker alpha</label><input id="set_malpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.marker_alpha}"></div><div><label>Line alpha</label><input id="set_lalpha" type="range" min="0.1" max="1" step="0.05" value="${cfg.plot.line_alpha}"></div><div><label>Default heatmap palette</label>${paletteSelect("set_cmap", cfg.plotting.colors.heatmap)}</div></div></div>
       <div class="panel tab-panel hidden" data-panel="1"><label class="check"><input id="set_smooth" type="checkbox" ${cfg.plot.smoothing.enabled ? "checked" : ""}> Enabled</label><div class="grid two"><div><label>Window length</label><input id="set_window" type="range" min="3" max="51" step="2" value="${cfg.plot.smoothing.window_length}"></div><div><label>Polyorder</label><input id="set_poly" type="range" min="1" max="5" value="${cfg.plot.smoothing.polyorder}"></div></div></div>
       <div class="panel tab-panel hidden" data-panel="2"><label class="check"><input id="set_perwell" type="checkbox" ${cfg.plotting.y_axis.per_well ? "checked" : ""}> Per-well y-axis</label><div><label>Upper padding</label><input id="set_ypad" type="range" min="1" max="1.5" step="0.01" value="${cfg.plotting.y_axis.upper_padding}"></div><label class="check"><input id="set_nice" type="checkbox" ${cfg.plotting.y_axis.rounding_mode === "nice_round" ? "checked" : ""}> Nice rounding</label></div>
       <div class="panel tab-panel hidden" data-panel="3"><div class="grid two"><div><label>Output root folder</label><input id="set_output_root" value="${esc(cfg.output.base_dir)}"></div><div><label>Run index path</label><input id="set_run_index" value="${esc(cfg.output.run_index)}"></div></div><label class="check"><input type="checkbox" checked disabled> Save metadata</label><label class="check"><input type="checkbox" checked disabled> Save config snapshot</label><label class="check"><input type="checkbox" checked disabled> Save processing log</label></div>
       <div class="panel tab-panel hidden" data-panel="4"><label class="check"><input id="set_show_recent" type="checkbox" ${cfg.ui.show_recent_runs ? "checked" : ""}> Show recent runs on dashboard</label><div><label>Number of recent runs</label><input id="set_recent" type="range" min="3" max="10" value="${cfg.ui.recent_runs}"></div></div>
       <div class="panel tab-panel hidden" data-panel="5"><button id="exportConfig">Export config.yaml</button><input id="importConfig" type="file" accept=".yaml,.yml,.json"><button id="loadConfig" type="button">Load imported config</button></div>
       <div class="actions"><button class="primary" id="saveSettings">Save settings</button><button id="resetSettings">Reset to config.yaml</button></div>`;
-    $("set_cmap").value = cfg.plotting.colors.heatmap;
+    wireVisualSelects($("workspace"));
     $("workspace").querySelector("[data-back]").addEventListener("click", renderDashboard);
     $("settingsTabs").querySelectorAll("[data-tab]").forEach((btn) => btn.addEventListener("click", () => {
       $("settingsTabs").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
