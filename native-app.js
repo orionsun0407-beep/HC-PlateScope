@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-07-palette-menu";
+  const APP_VERSION = "2026-08-07-color-inputs";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -30,19 +30,6 @@
     { id: "crest", name: "crest", colors: ["#173F5F", "#2C7C7B", "#8FD0A9", "#F5F7D4"] },
     { id: "coolwarm", name: "coolwarm", colors: ["#3B4CC0", "#89A9FC", "#F7F7F7", "#F4987A", "#B40426"] },
     { id: "magma", name: "magma", colors: ["#000004", "#3B0F70", "#8C2981", "#DE4968", "#FCFDBF"] },
-  ];
-
-  const COLOR_PRESETS = [
-    { id: "#0F4D92", name: "Deep blue" },
-    { id: "#8BCF8B", name: "Fresh green" },
-    { id: "#42949E", name: "Teal ratio" },
-    { id: "#9A4D8E", name: "LUCI purple" },
-    { id: "#B64342", name: "Scientific red" },
-    { id: "#E28E2C", name: "Amber" },
-    { id: "#2F5D50", name: "Forest green" },
-    { id: "#4C78A8", name: "Calm blue" },
-    { id: "#6BB7A8", name: "Mint teal" },
-    { id: "#8E7DBE", name: "Soft violet" },
   ];
 
   const DEFAULT_CONFIG = {
@@ -695,13 +682,6 @@
     return `<div class="palette-select-wrap" data-palette-root><input id="${id}" type="hidden" value="${esc(current.id)}" data-palette-input><button class="palette-trigger" type="button" data-palette-trigger aria-haspopup="listbox" aria-expanded="false"><span data-palette-name>${esc(current.name)}</span><i data-palette-preview style="background: linear-gradient(90deg, ${esc(current.colors.join(", "))})"></i></button><div class="palette-menu" data-palette-menu role="listbox">${options}</div></div>`;
   }
 
-  function colorSelect(id, value) {
-    const known = COLOR_PRESETS.some((color) => color.id.toLowerCase() === String(value).toLowerCase());
-    const options = COLOR_PRESETS.map((color) => `<option value="${esc(color.id)}" ${color.id.toLowerCase() === String(value).toLowerCase() ? "selected" : ""}>${esc(color.name)}</option>`).join("");
-    const custom = known ? "" : `<option value="${esc(value)}" selected>Custom</option>`;
-    return `<div class="color-select-wrap"><select id="${id}" data-color-select>${options}${custom}</select><span class="color-bar" data-color-preview="${id}" style="background: ${esc(value)}"></span></div>`;
-  }
-
   function wireVisualSelects(root = document) {
     root.querySelectorAll("[data-palette-root]").forEach((picker) => {
       const input = picker.querySelector("[data-palette-input]");
@@ -741,14 +721,6 @@
         });
       });
     }
-    root.querySelectorAll("[data-color-select]").forEach((select) => {
-      const update = () => {
-        const preview = root.querySelector(`[data-color-preview="${select.id}"]`);
-        if (preview) preview.style.background = select.value;
-      };
-      select.addEventListener("change", update);
-      update();
-    });
   }
 
   function hexToRgb(hex) {
@@ -1658,9 +1630,9 @@
             <label class="check"><input id="${module}_nice" type="checkbox" checked> Nice rounding enabled</label>
           </div>
           <div class="settings-group color-settings-group">
-            <div><label>${esc(colorA)}</label>${colorSelect(`${module}_primary`, cfg.plotting.colors.primary)}</div>
-            <div><label>${esc(colorB)}</label>${colorSelect(`${module}_secondary`, cfg.plotting.colors.secondary)}</div>
-            ${includeHeatmap ? `<div><label>Heatmap colormap</label>${paletteSelect(`${module}_cmap`, cfg.plotting.colors.heatmap)}</div>${["geco", "luci"].includes(module) ? `<div><label>Ratio badge color</label>${colorSelect(`${module}_ratio_badge`, module === "luci" ? cfg.plotting.badges.luci_ratio : cfg.plotting.badges.geco_ratio)}</div>` : ""}<div><label>Low percentile</label><input id="${module}_robust_low" type="number" min="0" max="20" value="5"></div><div><label>High percentile</label><input id="${module}_robust_high" type="number" min="80" max="100" value="95"></div>` : ""}
+            <div><label>${esc(colorA)}</label><input id="${module}_primary" type="color" value="${cfg.plotting.colors.primary}"></div>
+            <div><label>${esc(colorB)}</label><input id="${module}_secondary" type="color" value="${cfg.plotting.colors.secondary}"></div>
+            ${includeHeatmap ? `<div><label>Heatmap colormap</label>${paletteSelect(`${module}_cmap`, cfg.plotting.colors.heatmap)}</div>${["geco", "luci"].includes(module) ? `<div><label>Ratio badge color</label><input id="${module}_ratio_badge" type="color" value="${module === "luci" ? cfg.plotting.badges.luci_ratio : cfg.plotting.badges.geco_ratio}"></div>` : ""}<div><label>Low percentile</label><input id="${module}_robust_low" type="number" min="0" max="20" value="5"></div><div><label>High percentile</label><input id="${module}_robust_high" type="number" min="80" max="100" value="95"></div>` : ""}
           </div>
         </details>
         <div class="settings-group single">${controlField("Project name for this run", `<input id="${module}_run_name" value="${esc(`${module === "wellid" ? "Well ID" : MODULES[module].title.split(" ")[0]} ${new Date().toISOString().slice(0, 10)}`)}">`)}</div>
