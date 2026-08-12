@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-12-fixed-cm-sparse";
+  const APP_VERSION = "2026-08-12-plots-per-row-guard";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -868,9 +868,12 @@
     const left = report ? 4 : 22;
     const top = report ? 18 : 48;
     const sparseFitCols = Math.max(1, Math.floor((sparseReportMaxWidth - left * 2 + gap) / (sparsePanelSize + gap)));
-    const sparseNaturalCols = Math.max(1, Math.ceil(Math.sqrt(wells.length)));
-    const sparseReportCols = report && sparse ? Math.min(baseCols, sparseFitCols, sparseNaturalCols) : baseCols;
-    const ncols = sparseReportCols;
+    if (report && sparse && baseCols > sparseFitCols) {
+      const error = new Error(`Plots per row = ${baseCols} 放不进 PDF 报告。当前稀疏样品模式下单个散点图固定为 2.5 cm，每行最多建议 ${sparseFitCols} 个；请把 Plots per row 调小后重新运行。`);
+      error.showAlert = true;
+      throw error;
+    }
+    const ncols = baseCols;
     const basePanelW = report ? 48 : 128;
     const basePanelH = report ? 57 : 100;
     const panelW = report && sparse ? sparsePanelSize : basePanelW;
@@ -1879,6 +1882,7 @@
       renderResult(result);
       updateSide();
     } catch (error) {
+      if (error?.showAlert) window.alert(error.message);
       area.innerHTML = `<div class="hc-info-card hc-error"><strong>${esc(error.message)}</strong>${state.debug ? `<pre class="log">${esc(error.stack)}</pre>` : ""}</div>`;
     }
   }
