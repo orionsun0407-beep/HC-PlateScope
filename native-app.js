@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-07-pdf-preview-xlsx";
+  const APP_VERSION = "2026-08-12-sparse-report-layout";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -284,6 +284,11 @@
       rows: format === 96 ? "ABCDEFGH".split("") : ROWS_384,
       cols: format === 96 ? Array.from({ length: 12 }, (_, i) => i + 1) : COLS_384,
     };
+  }
+
+  function isSparsePlate(layout, count) {
+    const total = layout.rows.length * layout.cols.length;
+    return total > 0 && count > 0 && count < total * 0.5;
   }
 
   function sortedWells(wells, config = state.config) {
@@ -852,27 +857,37 @@
 
   function gridSvg({ title, tables, labels, wells, config, normalized = false, moduleKey = "", highlights = {}, report = false }) {
     const layout = config.plotting.spectra_grid || {};
-    const ncols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plateLayout(config, wells).cols.length;
+    const plate = plateLayout(config, wells);
+    const sparse = isSparsePlate(plate, wells.length);
+    const baseCols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plate.cols.length;
+    const ncols = baseCols;
     const pageWells = wells.slice();
-    const panelW = report ? 48 : 128;
-    const panelH = report ? 57 : 100;
+    const panelScale = report && sparse ? 1.1 : 1;
+    const basePanelW = report ? 48 : 128;
+    const basePanelH = report ? 57 : 100;
+    const panelW = basePanelW * panelScale;
+    const panelH = basePanelH * panelScale;
     const gap = report ? 1.5 : 14;
     const rows = Math.ceil(pageWells.length / ncols);
     const left = report ? 4 : 22;
     const top = report ? 18 : 48;
-    const width = left * 2 + ncols * panelW + (ncols - 1) * gap;
-    const height = top + rows * panelH + (rows - 1) * gap + (report ? 10 : 26);
+    const width = left * 2 + ncols * basePanelW + Math.max(0, ncols - 1) * gap;
+    const height = top + rows * Math.max(basePanelH, panelH) + Math.max(0, rows - 1) * gap + (report ? 10 : 26);
     const colors = [config.plotting.colors.primary, config.plotting.colors.secondary];
     const panels = pageWells.map((well, idx) => {
       const col = idx % ncols;
       const row = Math.floor(idx / ncols);
+      const rowStart = row * ncols;
+      const wellsInRow = Math.min(ncols, pageWells.length - rowStart);
+      const rowW = wellsInRow * panelW + Math.max(0, wellsInRow - 1) * gap;
+      const rowOffset = report && sparse ? (width - left * 2 - rowW) / 2 : 0;
       return wellPanelSvg({
         tables,
         labels,
         colors,
         well,
         title: well,
-        x: left + col * (panelW + gap),
+        x: left + rowOffset + col * (panelW + gap),
         y: top + row * (panelH + gap),
         width: panelW,
         height: panelH,
@@ -894,24 +909,24 @@
 
   function heatmapSvg(values, config, title, label) {
     const layout = plateLayout(config, Object.keys(values));
+    const sparse = isSparsePlate(layout, Object.keys(values).length);
     const rows = layout.rows;
     const cols = layout.cols;
     const cell = layout.format === 384 ? 24 : 34;
     const left = 48;
     const top = 58;
-    const colorbar = { w: 14, gap: 30 };
-    const width = left + cols.length * cell + colorbar.gap + colorbar.w + 64;
-    const height = top + rows.length * cell + 52;
+    const rightPad = sparse ? 48 : 64;
+    const colorbar = sparse ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
+    const gridW = cols.length * cell;
+    const gridH = rows.length * cell;
+    const width = sparse ? left + gridW + rightPad : left + gridW + colorbar.gap + colorbar.w + 64;
+    const height = sparse ? top + gridH + colorbar.gap + colorbar.h + 44 : top + gridH + 52;
     const finite = Object.values(values).map(Number).filter(Number.isFinite);
     const min = finite.length ? Math.min(...finite) : 0;
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
-    const barX = left + cols.length * cell + colorbar.gap;
-    const barY = top;
-    const barH = rows.length * cell - 1;
     let body = `<rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="26" text-anchor="middle" font-size="18" font-weight="700" fill="#111">${esc(title)}</text>
-      <text x="${width / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="#444">${esc(label)}</text>`;
+      <text x="${width / 2}" y="26" text-anchor="middle" font-size="18" font-weight="700" fill="#111">${esc(title)}</text>`;
     cols.forEach((col, i) => { body += svgEl("text", { x: left + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": 8, fill: "#444" }, col); });
     rows.forEach((row, r) => {
       body += svgEl("text", { x: left - 12, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": 8, fill: "#444" }, row);
@@ -926,19 +941,41 @@
       });
     });
     const segments = 80;
-    for (let i = 0; i < segments; i += 1) {
-      const t0 = i / segments;
-      const y0 = barY + barH - (i + 1) * barH / segments;
-      body += svgEl("rect", { x: barX, y: y0, width: colorbar.w, height: Math.ceil(barH / segments) + 0.4, fill: lerpColor(ramp, t0), stroke: "none" });
+    if (sparse) {
+      const barW = Math.min(gridW * 0.78, width - left * 2);
+      const barX = left + (gridW - barW) / 2;
+      const barY = top + gridH + colorbar.gap;
+      for (let i = 0; i < segments; i += 1) {
+        const t0 = i / segments;
+        const x0 = barX + i * barW / segments;
+        body += svgEl("rect", { x: x0, y: barY, width: Math.ceil(barW / segments) + 0.5, height: colorbar.h, fill: lerpColor(ramp, t0), stroke: "none" });
+      }
+      body += svgEl("rect", { x: barX, y: barY, width: barW, height: colorbar.h, fill: "none", stroke: "#555", "stroke-width": 0.45 });
+      const tickValues = [min, (min + max) / 2, max];
+      tickValues.forEach((value, idx) => {
+        const xTick = idx === 0 ? barX : idx === 1 ? barX + barW / 2 : barX + barW;
+        body += svgEl("line", { x1: xTick, y1: barY + colorbar.h, x2: xTick, y2: barY + colorbar.h + 4, stroke: "#444", "stroke-width": 0.45 });
+        body += svgEl("text", { x: xTick, y: barY + colorbar.h + 13, "text-anchor": "middle", "font-size": 7, fill: "#444" }, fmt(value, 2));
+      });
+      body += svgEl("text", { x: width / 2, y: height - 8, "text-anchor": "middle", "font-size": 8, fill: "#444" }, esc(label));
+    } else {
+      const barX = left + gridW + colorbar.gap;
+      const barY = top;
+      const barH = gridH - 1;
+      for (let i = 0; i < segments; i += 1) {
+        const t0 = i / segments;
+        const y0 = barY + barH - (i + 1) * barH / segments;
+        body += svgEl("rect", { x: barX, y: y0, width: colorbar.w, height: Math.ceil(barH / segments) + 0.4, fill: lerpColor(ramp, t0), stroke: "none" });
+      }
+      body += svgEl("rect", { x: barX, y: barY, width: colorbar.w, height: barH, fill: "none", stroke: "#555", "stroke-width": 0.45 });
+      const tickValues = [max, (min + max) / 2, min];
+      tickValues.forEach((value, idx) => {
+        const yTick = idx === 0 ? barY : idx === 1 ? barY + barH / 2 : barY + barH;
+        body += svgEl("line", { x1: barX + colorbar.w, y1: yTick, x2: barX + colorbar.w + 4, y2: yTick, stroke: "#444", "stroke-width": 0.45 });
+        body += svgEl("text", { x: barX + colorbar.w + 7, y: yTick + 3, "font-size": 7, fill: "#444" }, fmt(value, 2));
+      });
+      body += svgEl("text", { x: barX + colorbar.w / 2, y: barY + barH + 22, "text-anchor": "middle", "font-size": 8, fill: "#444" }, esc(label));
     }
-    body += svgEl("rect", { x: barX, y: barY, width: colorbar.w, height: barH, fill: "none", stroke: "#555", "stroke-width": 0.45 });
-    const tickValues = [max, (min + max) / 2, min];
-    tickValues.forEach((value, idx) => {
-      const yTick = idx === 0 ? barY : idx === 1 ? barY + barH / 2 : barY + barH;
-      body += svgEl("line", { x1: barX + colorbar.w, y1: yTick, x2: barX + colorbar.w + 4, y2: yTick, stroke: "#444", "stroke-width": 0.45 });
-      body += svgEl("text", { x: barX + colorbar.w + 7, y: yTick + 3, "font-size": 7, fill: "#444" }, fmt(value, 2));
-    });
-    body += svgEl("text", { x: barX + colorbar.w / 2, y: barY + barH + 22, "text-anchor": "middle", "font-size": 8, fill: "#444" }, esc(label));
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
   }
 
