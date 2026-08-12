@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-12-sparse-heatmap-crop";
+  const APP_VERSION = "2026-08-12-cell-size-only";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -860,9 +860,10 @@
     const plate = plateLayout(config, wells);
     const sparse = isSparsePlate(plate, wells.length);
     const baseCols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plate.cols.length;
-    const ncols = baseCols;
+    const sparseReportCols = report && sparse ? Math.max(1, Math.min(baseCols, Math.ceil(Math.sqrt(wells.length * 1.35)))) : baseCols;
+    const ncols = sparseReportCols;
     const pageWells = wells.slice();
-    const panelScale = report && sparse ? 1.1 : 1;
+    const panelScale = report && sparse ? 2.2 : 1;
     const basePanelW = report ? 48 : 128;
     const basePanelH = report ? 57 : 100;
     const panelW = basePanelW * panelScale;
@@ -871,7 +872,7 @@
     const rows = Math.ceil(pageWells.length / ncols);
     const left = report ? 4 : 22;
     const top = report ? 18 : 48;
-    const width = left * 2 + ncols * basePanelW + Math.max(0, ncols - 1) * gap;
+    const width = left * 2 + ncols * panelW + Math.max(0, ncols - 1) * gap;
     const height = top + rows * Math.max(basePanelH, panelH) + Math.max(0, rows - 1) * gap + (report ? 10 : 26);
     const colors = [config.plotting.colors.primary, config.plotting.colors.secondary];
     const panels = pageWells.map((well, idx) => {
@@ -923,31 +924,34 @@
     const colorbar = sparse ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
     const gridW = cols.length * cell;
     const gridH = rows.length * cell;
-    const width = sparse ? left + gridW + rightPad : left + gridW + colorbar.gap + colorbar.w + 64;
+    const minSparseWidth = 520;
+    const width = sparse ? Math.max(minSparseWidth, left + gridW + rightPad) : left + gridW + colorbar.gap + colorbar.w + 64;
     const height = sparse ? top + gridH + colorbar.gap + colorbar.h + 44 : top + gridH + 52;
+    const gridX = sparse ? (width - gridW) / 2 : left;
+    const rowLabelX = gridX - 12;
     const finite = Object.values(values).map(Number).filter(Number.isFinite);
     const min = finite.length ? Math.min(...finite) : 0;
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
     let body = `<rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="26" text-anchor="middle" font-size="18" font-weight="700" fill="#111">${esc(title)}</text>`;
-    cols.forEach((col, i) => { body += svgEl("text", { x: left + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": 8, fill: "#444" }, col); });
+      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${sparse ? 14 : 18}" font-weight="700" fill="#111">${esc(title)}</text>`;
+    cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": 8, fill: "#444" }, col); });
     rows.forEach((row, r) => {
-      body += svgEl("text", { x: left - 12, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": 8, fill: "#444" }, row);
+      body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": 8, fill: "#444" }, row);
       cols.forEach((col, c) => {
         const well = `${row}${String(col).padStart(2, "0")}`;
         const value = Number(values[well]);
         const fill = Number.isFinite(value) ? lerpColor(ramp, (value - min) / Math.max(1e-9, max - min)) : "#F2F2F2";
-        body += svgEl("rect", { x: left + c * cell, y: top + r * cell, width: cell - 1, height: cell - 1, fill, stroke: "#fff", "stroke-width": 0.5 });
+        body += svgEl("rect", { x: gridX + c * cell, y: top + r * cell, width: cell - 1, height: cell - 1, fill, stroke: "#fff", "stroke-width": 0.5 });
         if (config.plotting.heatmap.show_values && Number.isFinite(value) && (sparse || cell >= 28)) {
-          body += svgEl("text", { x: left + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": sparse ? 6.5 : 7, fill: "#1F2A24" }, fmt(value, 2));
+          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": sparse ? 6.5 : 7, fill: "#1F2A24" }, fmt(value, 2));
         }
       });
     });
     const segments = 80;
     if (sparse) {
-      const barW = Math.min(gridW * 0.78, width - left * 2);
-      const barX = left + (gridW - barW) / 2;
+      const barW = Math.min(Math.max(gridW, 180), width - left * 2);
+      const barX = (width - barW) / 2;
       const barY = top + gridH + colorbar.gap;
       for (let i = 0; i < segments; i += 1) {
         const t0 = i / segments;
@@ -963,7 +967,7 @@
       });
       body += svgEl("text", { x: width / 2, y: height - 8, "text-anchor": "middle", "font-size": 8, fill: "#444" }, esc(label));
     } else {
-      const barX = left + gridW + colorbar.gap;
+      const barX = gridX + gridW + colorbar.gap;
       const barY = top;
       const barH = gridH - 1;
       for (let i = 0; i < segments; i += 1) {
@@ -992,7 +996,7 @@
     const gridRegion = { x: marginX, y: 38, width: width - marginX * 2, height: 500 };
     const heatRegion = { x: 42, y: 552, width: width - 84, height: 280 };
     const gridScale = Math.min(gridRegion.width / gridBox.width, gridRegion.height / gridBox.height);
-    const heatScale = Math.min(heatRegion.width / heatBox.width, heatRegion.height / heatBox.height);
+    const heatScale = Math.min(1, heatRegion.width / heatBox.width, heatRegion.height / heatBox.height);
     const gridX = gridRegion.x + (gridRegion.width - gridBox.width * gridScale) / 2;
     const heatX = heatRegion.x + (heatRegion.width - heatBox.width * heatScale) / 2;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
