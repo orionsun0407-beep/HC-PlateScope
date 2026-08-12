@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-12-sparse-report-layout";
+  const APP_VERSION = "2026-08-12-sparse-heatmap-crop";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -909,10 +909,14 @@
 
   function heatmapSvg(values, config, title, label) {
     const layout = plateLayout(config, Object.keys(values));
-    const sparse = isSparsePlate(layout, Object.keys(values).length);
-    const rows = layout.rows;
-    const cols = layout.cols;
-    const cell = layout.format === 384 ? 24 : 34;
+    const valueWells = Object.keys(values).filter((well) => Number.isFinite(Number(values[well])));
+    const sparse = isSparsePlate(layout, valueWells.length);
+    const usedRows = new Set(valueWells.map((well) => well[0]));
+    const usedCols = new Set(valueWells.map((well) => Number(well.slice(1))));
+    const rows = sparse ? layout.rows.filter((row) => usedRows.has(row)) : layout.rows;
+    const cols = sparse ? layout.cols.filter((col) => usedCols.has(col)) : layout.cols;
+    const baseCell = layout.format === 384 ? 24 : 34;
+    const cell = sparse ? baseCell * 1.5 : baseCell;
     const left = 48;
     const top = 58;
     const rightPad = sparse ? 48 : 64;
@@ -935,8 +939,8 @@
         const value = Number(values[well]);
         const fill = Number.isFinite(value) ? lerpColor(ramp, (value - min) / Math.max(1e-9, max - min)) : "#F2F2F2";
         body += svgEl("rect", { x: left + c * cell, y: top + r * cell, width: cell - 1, height: cell - 1, fill, stroke: "#fff", "stroke-width": 0.5 });
-        if (config.plotting.heatmap.show_values && Number.isFinite(value) && cell >= 28) {
-          body += svgEl("text", { x: left + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": 7, fill: "#1F2A24" }, fmt(value, 2));
+        if (config.plotting.heatmap.show_values && Number.isFinite(value) && (sparse || cell >= 28)) {
+          body += svgEl("text", { x: left + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": sparse ? 6.5 : 7, fill: "#1F2A24" }, fmt(value, 2));
         }
       });
     });
