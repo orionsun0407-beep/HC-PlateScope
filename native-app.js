@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-12-cell-size-only";
+  const APP_VERSION = "2026-08-12-fixed-cm-sparse";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -860,18 +860,22 @@
     const plate = plateLayout(config, wells);
     const sparse = isSparsePlate(plate, wells.length);
     const baseCols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plate.cols.length;
-    const sparseReportCols = report && sparse ? Math.max(1, Math.min(baseCols, Math.ceil(Math.sqrt(wells.length * 1.35)))) : baseCols;
-    const ncols = sparseReportCols;
+    const cm = 28.3464567;
+    const sparsePanelSize = 2.5 * cm;
+    const sparseReportMaxWidth = 559;
     const pageWells = wells.slice();
-    const panelScale = report && sparse ? 2.2 : 1;
-    const basePanelW = report ? 48 : 128;
-    const basePanelH = report ? 57 : 100;
-    const panelW = basePanelW * panelScale;
-    const panelH = basePanelH * panelScale;
-    const gap = report ? 1.5 : 14;
-    const rows = Math.ceil(pageWells.length / ncols);
+    const gap = report ? (sparse ? 4 : 1.5) : 14;
     const left = report ? 4 : 22;
     const top = report ? 18 : 48;
+    const sparseFitCols = Math.max(1, Math.floor((sparseReportMaxWidth - left * 2 + gap) / (sparsePanelSize + gap)));
+    const sparseNaturalCols = Math.max(1, Math.ceil(Math.sqrt(wells.length)));
+    const sparseReportCols = report && sparse ? Math.min(baseCols, sparseFitCols, sparseNaturalCols) : baseCols;
+    const ncols = sparseReportCols;
+    const basePanelW = report ? 48 : 128;
+    const basePanelH = report ? 57 : 100;
+    const panelW = report && sparse ? sparsePanelSize : basePanelW;
+    const panelH = report && sparse ? sparsePanelSize : basePanelH;
+    const rows = Math.ceil(pageWells.length / ncols);
     const width = left * 2 + ncols * panelW + Math.max(0, ncols - 1) * gap;
     const height = top + rows * Math.max(basePanelH, panelH) + Math.max(0, rows - 1) * gap + (report ? 10 : 26);
     const colors = [config.plotting.colors.primary, config.plotting.colors.secondary];
@@ -916,8 +920,9 @@
     const usedCols = new Set(valueWells.map((well) => Number(well.slice(1))));
     const rows = sparse ? layout.rows.filter((row) => usedRows.has(row)) : layout.rows;
     const cols = sparse ? layout.cols.filter((col) => usedCols.has(col)) : layout.cols;
+    const cm = 28.3464567;
     const baseCell = layout.format === 384 ? 24 : 34;
-    const cell = sparse ? baseCell * 1.5 : baseCell;
+    const cell = sparse ? 1.5 * cm : baseCell;
     const left = 48;
     const top = 58;
     const rightPad = sparse ? 48 : 64;
@@ -934,7 +939,7 @@
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
     let body = `<rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${sparse ? 14 : 18}" font-weight="700" fill="#111">${esc(title)}</text>`;
+      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${sparse ? 11 : 18}" font-weight="700" fill="#111">${esc(title)}</text>`;
     cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": 8, fill: "#444" }, col); });
     rows.forEach((row, r) => {
       body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": 8, fill: "#444" }, row);
@@ -995,7 +1000,7 @@
     const marginX = 18;
     const gridRegion = { x: marginX, y: 38, width: width - marginX * 2, height: 500 };
     const heatRegion = { x: 42, y: 552, width: width - 84, height: 280 };
-    const gridScale = Math.min(gridRegion.width / gridBox.width, gridRegion.height / gridBox.height);
+    const gridScale = Math.min(1, gridRegion.width / gridBox.width, gridRegion.height / gridBox.height);
     const heatScale = Math.min(1, heatRegion.width / heatBox.width, heatRegion.height / heatBox.height);
     const gridX = gridRegion.x + (gridRegion.width - gridBox.width * gridScale) / 2;
     const heatX = heatRegion.x + (heatRegion.width - heatBox.width * heatScale) / 2;
