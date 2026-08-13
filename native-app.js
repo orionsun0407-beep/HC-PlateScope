@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-12-plots-per-row-guard";
+  const APP_VERSION = "2026-08-13-sparse-threshold-30";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -288,7 +288,7 @@
 
   function isSparsePlate(layout, count) {
     const total = layout.rows.length * layout.cols.length;
-    return total > 0 && count > 0 && count < total * 0.5;
+    return total > 0 && count > 0 && count < total * 0.3;
   }
 
   function sortedWells(wells, config = state.config) {
