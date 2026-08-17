@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-13-sparse-threshold-30";
+  const APP_VERSION = "2026-08-17-read-plots-per-row";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -1821,37 +1821,48 @@
     }
   }
 
+
+  function moduleControl(module, suffix) {
+    return $(`${module}_${suffix}`) || $(`runForm`)?.querySelector(`[id$="_${suffix}"]`);
+  }
+
+  function numberControlValue(module, suffix, fallback) {
+    const control = moduleControl(module, suffix);
+    const value = Number(control?.value);
+    return Number.isFinite(value) ? value : fallback;
+  }
+
   function formConfig(module) {
     const cfg = deepCopy(state.config);
-    cfg.run_name = $(`${module}_run_name`)?.value?.trim() || "";
-    cfg.plate.format = $(`${module}_plate`)?.value === "auto" ? "auto" : Number($(`${module}_plate`)?.value || 96);
-    cfg.plotting.spectra_grid.mode = $(`${module}_spectra_mode`)?.value || "compact";
-    cfg.plotting.spectra_grid.columns = Number($(`${module}_spectra_columns`)?.value || 12);
-    cfg.plotting.spectra_grid.rows_per_page = Number($(`${module}_rows_page`)?.value || 8);
+    cfg.run_name = moduleControl(module, "run_name")?.value?.trim() || "";
+    cfg.plate.format = moduleControl(module, "plate")?.value === "auto" ? "auto" : Number(moduleControl(module, "plate")?.value || 96);
+    cfg.plotting.spectra_grid.mode = moduleControl(module, "spectra_mode")?.value || "compact";
+    cfg.plotting.spectra_grid.columns = numberControlValue(module, "spectra_columns", cfg.plotting.spectra_grid.columns || 12);
+    cfg.plotting.spectra_grid.rows_per_page = numberControlValue(module, "rows_page", cfg.plotting.spectra_grid.rows_per_page || 8);
     cfg.plot.smoothing.enabled = false;
-    cfg.plot.marker_size = Number($(`${module}_marker`)?.value || 1);
-    cfg.plot.line_width = Number($(`${module}_line`)?.value || 1);
-    cfg.plotting.y_axis.per_well = getChecked(`${module}_perwell`);
-    cfg.plotting.y_axis.upper_padding = Number($(`${module}_ypad`)?.value || 1.1);
-    cfg.plot.smoothing.window_length = Number($(`${module}_window`)?.value || 9);
-    cfg.plot.smoothing.polyorder = Number($(`${module}_poly`)?.value || 3);
-    cfg.plot.marker_alpha = Number($(`${module}_malpha`)?.value || 0.55);
-    cfg.plot.line_alpha = Number($(`${module}_lalpha`)?.value || 0.95);
-    cfg.plotting.y_axis.rounding_mode = getChecked(`${module}_nice`) ? "nice_round" : "raw";
-    cfg.plotting.colors.primary = $(`${module}_primary`)?.value || cfg.plotting.colors.primary;
-    cfg.plotting.colors.secondary = $(`${module}_secondary`)?.value || cfg.plotting.colors.secondary;
-    if ($(`${module}_heat_vals`)) cfg.plotting.heatmap.show_values = getChecked(`${module}_heat_vals`);
-    if ($(`${module}_robust`)) cfg.plotting.heatmap.robust_scaling = getChecked(`${module}_robust`);
-    if ($(`${module}_cmap`)) cfg.plotting.colors.heatmap = $(`${module}_cmap`).value;
-    if ($(`${module}_ratio_badge`)) {
-      if (module === "luci") cfg.plotting.badges.luci_ratio = $(`${module}_ratio_badge`).value;
-      else cfg.plotting.badges.geco_ratio = $(`${module}_ratio_badge`).value;
+    cfg.plot.marker_size = numberControlValue(module, "marker", cfg.plot.marker_size || 1);
+    cfg.plot.line_width = numberControlValue(module, "line", cfg.plot.line_width || 1);
+    cfg.plotting.y_axis.per_well = Boolean(moduleControl(module, "perwell")?.checked);
+    cfg.plotting.y_axis.upper_padding = numberControlValue(module, "ypad", cfg.plotting.y_axis.upper_padding || 1.1);
+    cfg.plot.smoothing.window_length = numberControlValue(module, "window", cfg.plot.smoothing.window_length || 9);
+    cfg.plot.smoothing.polyorder = numberControlValue(module, "poly", cfg.plot.smoothing.polyorder || 3);
+    cfg.plot.marker_alpha = numberControlValue(module, "malpha", cfg.plot.marker_alpha || 0.55);
+    cfg.plot.line_alpha = numberControlValue(module, "lalpha", cfg.plot.line_alpha || 0.95);
+    cfg.plotting.y_axis.rounding_mode = Boolean(moduleControl(module, "nice")?.checked) ? "nice_round" : "raw";
+    cfg.plotting.colors.primary = moduleControl(module, "primary")?.value || cfg.plotting.colors.primary;
+    cfg.plotting.colors.secondary = moduleControl(module, "secondary")?.value || cfg.plotting.colors.secondary;
+    if (moduleControl(module, "heat_vals")) cfg.plotting.heatmap.show_values = Boolean(moduleControl(module, "heat_vals")?.checked);
+    if (moduleControl(module, "robust")) cfg.plotting.heatmap.robust_scaling = Boolean(moduleControl(module, "robust")?.checked);
+    if (moduleControl(module, "cmap")) cfg.plotting.colors.heatmap = moduleControl(module, "cmap").value;
+    if (moduleControl(module, "ratio_badge")) {
+      if (module === "luci") cfg.plotting.badges.luci_ratio = moduleControl(module, "ratio_badge").value;
+      else cfg.plotting.badges.geco_ratio = moduleControl(module, "ratio_badge").value;
     }
-    if ($(`${module}_robust_low`)) cfg.plotting.heatmap.robust_lower_percentile = Number($(`${module}_robust_low`).value || 5);
-    if ($(`${module}_robust_high`)) cfg.plotting.heatmap.robust_upper_percentile = Number($(`${module}_robust_high`).value || 95);
+    if (moduleControl(module, "robust_low")) cfg.plotting.heatmap.robust_lower_percentile = numberControlValue(module, "robust_low", 5);
+    if (moduleControl(module, "robust_high")) cfg.plotting.heatmap.robust_upper_percentile = numberControlValue(module, "robust_high", 95);
     if (module === "luci") {
-      cfg.peaks.luci_450_window = parseWindow($("luci_450").value, [430, 470]);
-      cfg.peaks.luci_520_window = parseWindow($("luci_520").value, [500, 540]);
+      cfg.peaks.luci_450_window = parseWindow(moduleControl(module, "450")?.value, [430, 470]);
+      cfg.peaks.luci_520_window = parseWindow(moduleControl(module, "520")?.value, [500, 540]);
     }
     return cfg;
   }
