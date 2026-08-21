@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-17-read-plots-per-row";
+  const APP_VERSION = "2026-08-21-multiblock-reader";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -326,6 +326,54 @@
     return { columns, rows };
   }
 
+  function tableFromMultiBlockAoA(aoa, config = state.config) {
+    const plateFormat = plateFormatFromConfig(config);
+    const blocks = [];
+    aoa.forEach((row, rowIndex) => {
+      const fields = (row || []).map((x) => String(x ?? "").trim());
+      const wavelengthIndex = fields.findIndex((field) => hasWavelengthKeyword(field, config));
+      if (wavelengthIndex < 0) return;
+      const wells = [];
+      fields.forEach((field, colIndex) => {
+        const well = normalizeWellId(field, plateFormat);
+        if (well) wells.push({ colIndex, well });
+      });
+      if (wells.length >= 2) blocks.push({ rowIndex, wavelengthIndex, wells });
+    });
+    if (blocks.length <= 1) return null;
+
+    const grouped = new Map();
+    const seenWells = new Set();
+    blocks.forEach((block, blockIndex) => {
+      const nextBlockRow = blocks[blockIndex + 1]?.rowIndex ?? aoa.length;
+      for (let r = block.rowIndex + 1; r < nextBlockRow; r += 1) {
+        const source = aoa[r] || [];
+        const wavelength = asNum(source[block.wavelengthIndex]);
+        if (!Number.isFinite(wavelength)) continue;
+        for (const { colIndex, well } of block.wells) {
+          const value = asNum(source[colIndex]);
+          if (!Number.isFinite(value)) continue;
+          const key = `${wavelength}||${well}`;
+          if (!grouped.has(key)) grouped.set(key, []);
+          grouped.get(key).push(value);
+          seenWells.add(well);
+        }
+      }
+    });
+    if (!grouped.size || !seenWells.size) return null;
+
+    const rowsByWavelength = new Map();
+    for (const [key, values] of grouped.entries()) {
+      const [wavelengthText, well] = key.split("||");
+      const wavelength = Number(wavelengthText);
+      if (!rowsByWavelength.has(wavelength)) rowsByWavelength.set(wavelength, { Wavelength: wavelength });
+      rowsByWavelength.get(wavelength)[well] = values.reduce((a, b) => a + b, 0) / values.length;
+    }
+    const wells = sortedWells([...seenWells], config);
+    const rows = [...rowsByWavelength.values()].sort((a, b) => a.Wavelength - b.Wavelength);
+    return { columns: ["Wavelength", ...wells], rows };
+  }
+
   function hasWavelengthKeyword(value, config = state.config) {
     const name = String(value ?? "").trim().toLowerCase();
     const keywords = config.input.wavelength_keywords.length ? config.input.wavelength_keywords : ["wavelength", "wave", "lambda", "nm"];
@@ -364,14 +412,14 @@
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      return tableFromAoA(aoa, detectHeaderRow(aoa, config));
+      return tableFromMultiBlockAoA(aoa, config) || tableFromAoA(aoa, detectHeaderRow(aoa, config));
     }
     if (ext === "csv") {
       const text = await file.text();
       const candidates = [",", "\t", ";"].map((delimiter) => Papa.parse(text, { delimiter, skipEmptyLines: false }).data);
       const best = candidates.map((aoa) => ({ aoa, header: detectHeaderRow(aoa, config), score: scoreHeader(aoa[detectHeaderRow(aoa, config)] || [], config) }))
         .sort((a, b) => b.score - a.score)[0];
-      return tableFromAoA(best.aoa, best.header);
+      return tableFromMultiBlockAoA(best.aoa, config) || tableFromAoA(best.aoa, best.header);
     }
     throw new Error(`Unsupported file type .${ext}. Please upload .xlsx, .xls, or .csv.`);
   }
