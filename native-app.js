@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-21-multiblock-reader";
+  const APP_VERSION = "2026-08-21-print-bold";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -44,8 +44,8 @@
     peaks: { luci_450_window: [430, 470], luci_520_window: [500, 540] },
     normalization: { enabled: true, mode: "max_per_well" },
     plotting: {
-      marker_size: 1.0,
-      line_width: 1.0,
+      marker_size: 1.2,
+      line_width: 1.4,
       alpha: 0.55,
       line_alpha: 0.95,
       dpi: 300,
@@ -83,8 +83,8 @@
       layout: { rows: 8, columns: 12 },
       page_size: "A4",
       orientation: "portrait",
-      marker_size: 1.0,
-      line_width: 1.0,
+      marker_size: 1.2,
+      line_width: 1.4,
       marker_alpha: 0.55,
       line_alpha: 0.95,
       smoothing: { enabled: true, method: "savgol", window_length: 9, polyorder: 3 },
@@ -845,33 +845,33 @@
     }
     const sx = (v) => x + pad.l + ((v - range.xmin) / Math.max(1e-9, range.xmax - range.xmin)) * innerW;
     const sy = (v) => y + pad.t + innerH - ((v - range.ymin) / Math.max(1e-9, range.ymax - range.ymin)) * innerH;
-    const markerRadius = compact ? Math.max(0.34, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.38) : Math.max(0.75, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.7);
-    const lineWidth = compact ? Math.max(0.34, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 0.5) : Math.max(0.6, Number(config.plot?.line_width || config.plotting?.line_width || 1));
+    const markerRadius = compact ? Math.max(0.42, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.48) : Math.max(0.85, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.78);
+    const lineWidth = compact ? Math.max(0.62, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 0.82) : Math.max(0.95, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 1.15);
     const markerAlpha = Number(config.plot?.marker_alpha || config.plotting?.alpha || 0.55);
     const lineAlpha = Number(config.plot?.line_alpha || config.plotting?.line_alpha || 0.95);
     const grid = [];
     const yTicks = [0, range.ymax / 2, range.ymax];
     for (const tick of ticks) {
       const gx = sx(tick);
-      grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": 0.45 }));
-      grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + (compact ? 1.5 : 3), stroke: "#333", "stroke-width": compact ? 0.25 : 0.45 }));
-      grid.push(svgEl("text", { x: gx + 0.7, y: y + height - (compact ? 3.5 : 6), "font-size": compact ? 2.6 : 5.2, fill: "#444", transform: `rotate(-90 ${gx + 0.7} ${y + height - (compact ? 3.5 : 6)})` }, fmt(tick, 0)));
+      grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": compact ? 0.55 : 0.5 }));
+      grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + (compact ? 1.5 : 3), stroke: "#333", "stroke-width": compact ? 0.42 : 0.58 }));
+      grid.push(svgEl("text", { x: gx + 0.7, y: y + height - (compact ? 3.5 : 6), "font-size": compact ? 3.3 : 6.0, "font-weight": "700", fill: "#333", transform: `rotate(-90 ${gx + 0.7} ${y + height - (compact ? 3.5 : 6)})` }, fmt(tick, 0)));
     }
     for (const tick of yTicks) {
       const gy = sy(tick);
-      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#EAEAEA", "stroke-width": 0.45 }));
-      grid.push(svgEl("line", { x1: x + pad.l - (compact ? 1.5 : 3), y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": compact ? 0.25 : 0.45 }));
-      grid.push(svgEl("text", { x: x + pad.l - (compact ? 2.4 : 5), y: gy + (compact ? 1.1 : 2), "text-anchor": "end", "font-size": compact ? 2.8 : 5.5, fill: "#444" }, fmt(tick, tick >= 10 ? 0 : 1)));
+      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#EAEAEA", "stroke-width": compact ? 0.55 : 0.5 }));
+      grid.push(svgEl("line", { x1: x + pad.l - (compact ? 1.5 : 3), y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": compact ? 0.42 : 0.58 }));
+      grid.push(svgEl("text", { x: x + pad.l - (compact ? 2.4 : 5), y: gy + (compact ? 1.1 : 2), "text-anchor": "end", "font-size": compact ? 3.5 : 6.2, "font-weight": "700", fill: "#333" }, fmt(tick, tick >= 10 ? 0 : 1)));
     }
     if (!ticks.length) {
       for (let i = 0; i <= 4; i += 1) {
         const gx = x + pad.l + innerW * i / 4;
-        grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": 0.45 }));
+        grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": compact ? 0.55 : 0.5 }));
       }
     }
     for (let i = 0; i <= 4; i += 1) {
       const gy = y + pad.t + innerH * i / 4;
-      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#F2F2F2", "stroke-width": 0.35 }));
+      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#F2F2F2", "stroke-width": compact ? 0.42 : 0.38 }));
     }
     const plots = [];
     tables.forEach((table, idx) => {
@@ -886,7 +886,7 @@
     const badgeX = x + width - badgeW - (compact ? 2 : 8);
     const badgeY = y + (compact ? 1.5 : 18);
     const badgeSvg = badge ? svgEl("rect", { x: badgeX, y: badgeY, width: badgeW, height: badgeH, rx: compact ? 1.2 : 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
-      svgEl("text", { x: badgeX + badgeW / 2, y: badgeY + (compact ? 4.4 : 10.5), "text-anchor": "middle", "font-size": compact ? 3.2 : 7.2, "font-weight": "700", fill: "white" }, badge.text) : "";
+      svgEl("text", { x: badgeX + badgeW / 2, y: badgeY + (compact ? 4.4 : 10.5), "text-anchor": "middle", "font-size": compact ? 3.8 : 7.8, "font-weight": "800", fill: "white" }, badge.text) : "";
     const titleAttrs = compact
       ? { x: x + 3, y: y + 5.2, "text-anchor": "start" }
       : moduleKey === "geco"
@@ -895,10 +895,10 @@
     return svgEl("g", {}, [
       svgEl("rect", { x, y, width, height, fill: "white" }),
       ...grid,
-      svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.35 : 0.75 }),
-      svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.35 : 0.75 }),
+      svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.55 : 0.9 }),
+      svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": compact ? 0.55 : 0.9 }),
       ...plots,
-      svgEl("text", { ...titleAttrs, "font-size": compact ? 4.2 : 8, "font-weight": "700", fill: "#333" }, title || well),
+      svgEl("text", { ...titleAttrs, "font-size": compact ? 5.2 : 9, "font-weight": "800", fill: "#333" }, title || well),
       badgeSvg,
     ].join(""));
   }
@@ -910,14 +910,13 @@
     const baseCols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plate.cols.length;
     const cm = 28.3464567;
     const sparsePanelSize = 2.5 * cm;
-    const sparseReportMaxWidth = 559;
+    const sparseReportMaxCols = 12;
     const pageWells = wells.slice();
     const gap = report ? (sparse ? 4 : 1.5) : 14;
     const left = report ? 4 : 22;
     const top = report ? 18 : 48;
-    const sparseFitCols = Math.max(1, Math.floor((sparseReportMaxWidth - left * 2 + gap) / (sparsePanelSize + gap)));
-    if (report && sparse && baseCols > sparseFitCols) {
-      const error = new Error(`Plots per row = ${baseCols} 放不进 PDF 报告。当前稀疏样品模式下单个散点图固定为 2.5 cm，每行最多建议 ${sparseFitCols} 个；请把 Plots per row 调小后重新运行。`);
+    if (report && sparse && baseCols > sparseReportMaxCols) {
+      const error = new Error(`Plots per row = ${baseCols} 放进 PDF 后会让单个散点图过小。当前稀疏样品模式下每行最多建议 ${sparseReportMaxCols} 个；请把 Plots per row 调小后重新运行。`);
       error.showAlert = true;
       throw error;
     }
@@ -957,9 +956,9 @@
     }).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-size="${report ? 8 : 18}" font-weight="700" fill="#111">${esc(title)}</text>
+      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-size="${report ? 9 : 18}" font-weight="800" fill="#111">${esc(title)}</text>
       ${panels}
-      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${report ? 5 : 10}" fill="#444">Wavelength (nm)</text>
+      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${report ? 6 : 10}" font-weight="700" fill="#333">Wavelength (nm)</text>
     </svg>`;
   }
 
@@ -1057,7 +1056,7 @@
     const heatX = heatRegion.x + (heatRegion.width - heatBox.width * heatScale) / 2;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="24" text-anchor="middle" font-size="10" font-weight="700" fill="#111">${esc(title)}</text>
+      <text x="${width / 2}" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${esc(title)}</text>
       <g transform="translate(${gridX.toFixed(2)} ${gridRegion.y}) scale(${gridScale.toFixed(5)})">${stripSvg(grid)}</g>
       <g transform="translate(${heatX.toFixed(2)} ${heatRegion.y}) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
     </svg>`;
