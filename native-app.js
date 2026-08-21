@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-21-384-portrait-pages";
+  const APP_VERSION = "2026-08-21-384-2p1cm-plots";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -905,7 +905,7 @@
     const configuredCols = Math.max(1, Math.min(24, Number(layout.columns || 12)));
     const baseCols = is384Report || layout.mode === "compact" ? configuredCols : plate.cols.length;
     const cm = 28.3464567;
-    const report384PanelSize = 2.5 * cm;
+    const report384PanelSize = 2.1 * cm;
     const report384MaxCols = 12;
     const pageWells = wells.slice();
     const gap = report ? (is384Report ? 4 : 1.5) : 14;
@@ -1062,13 +1062,13 @@
     const pageW = 595.28;
     const pageH = 841.89;
     const cm = 28.3464567;
-    const panelSize = 2.5 * cm;
+    const panelSize = 2.1 * cm;
     const gap = 4;
     const marginX = 0;
     const maxCols = Math.max(1, Math.floor((pageW - marginX * 2 + gap) / (panelSize + gap)));
     const requestedCols = Math.max(1, Math.min(24, Number(gridArgs.config?.plotting?.spectra_grid?.columns || 12)));
     if (requestedCols > maxCols) {
-      const error = new Error(`Plots per row = ${requestedCols} 无法在 A4 竖版中保持 2.5 cm 单图尺寸。384 孔板竖版报告每行最多建议 ${maxCols} 个；请把 Plots per row 调小后重新运行。`);
+      const error = new Error(`Plots per row = ${requestedCols} 无法在 A4 竖版中保持 2.1 cm 单图尺寸。384 孔板竖版报告每行最多建议 ${maxCols} 个；请把 Plots per row 调小后重新运行。`);
       error.showAlert = true;
       throw error;
     }
