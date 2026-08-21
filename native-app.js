@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-21-print-bold";
+  const APP_VERSION = "2026-08-21-384-fixed-layout";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -284,11 +284,6 @@
       rows: format === 96 ? "ABCDEFGH".split("") : ROWS_384,
       cols: format === 96 ? Array.from({ length: 12 }, (_, i) => i + 1) : COLS_384,
     };
-  }
-
-  function isSparsePlate(layout, count) {
-    const total = layout.rows.length * layout.cols.length;
-    return total > 0 && count > 0 && count < total * 0.3;
   }
 
   function sortedWells(wells, config = state.config) {
@@ -906,25 +901,26 @@
   function gridSvg({ title, tables, labels, wells, config, normalized = false, moduleKey = "", highlights = {}, report = false }) {
     const layout = config.plotting.spectra_grid || {};
     const plate = plateLayout(config, wells);
-    const sparse = isSparsePlate(plate, wells.length);
-    const baseCols = layout.mode === "compact" ? Math.max(4, Math.min(24, Number(layout.columns || 12))) : plate.cols.length;
+    const is384Report = report && plate.format === 384;
+    const configuredCols = Math.max(1, Math.min(24, Number(layout.columns || 12)));
+    const baseCols = is384Report || layout.mode === "compact" ? configuredCols : plate.cols.length;
     const cm = 28.3464567;
-    const sparsePanelSize = 2.5 * cm;
-    const sparseReportMaxCols = 12;
+    const report384PanelSize = 2.5 * cm;
+    const report384MaxCols = 12;
     const pageWells = wells.slice();
-    const gap = report ? (sparse ? 4 : 1.5) : 14;
+    const gap = report ? (is384Report ? 4 : 1.5) : 14;
     const left = report ? 4 : 22;
     const top = report ? 18 : 48;
-    if (report && sparse && baseCols > sparseReportMaxCols) {
-      const error = new Error(`Plots per row = ${baseCols} 放进 PDF 后会让单个散点图过小。当前稀疏样品模式下每行最多建议 ${sparseReportMaxCols} 个；请把 Plots per row 调小后重新运行。`);
+    if (is384Report && baseCols > report384MaxCols) {
+      const error = new Error(`Plots per row = ${baseCols} 放进 PDF 后会让单个散点图过小。384 孔板报告每行最多建议 ${report384MaxCols} 个；请把 Plots per row 调小后重新运行。`);
       error.showAlert = true;
       throw error;
     }
     const ncols = baseCols;
     const basePanelW = report ? 48 : 128;
     const basePanelH = report ? 57 : 100;
-    const panelW = report && sparse ? sparsePanelSize : basePanelW;
-    const panelH = report && sparse ? sparsePanelSize : basePanelH;
+    const panelW = is384Report ? report384PanelSize : basePanelW;
+    const panelH = is384Report ? report384PanelSize : basePanelH;
     const rows = Math.ceil(pageWells.length / ncols);
     const width = left * 2 + ncols * panelW + Math.max(0, ncols - 1) * gap;
     const height = top + rows * Math.max(basePanelH, panelH) + Math.max(0, rows - 1) * gap + (report ? 10 : 26);
@@ -935,7 +931,7 @@
       const rowStart = row * ncols;
       const wellsInRow = Math.min(ncols, pageWells.length - rowStart);
       const rowW = wellsInRow * panelW + Math.max(0, wellsInRow - 1) * gap;
-      const rowOffset = report && sparse ? (width - left * 2 - rowW) / 2 : 0;
+      const rowOffset = is384Report ? (width - left * 2 - rowW) / 2 : 0;
       return wellPanelSvg({
         tables,
         labels,
@@ -965,31 +961,31 @@
   function heatmapSvg(values, config, title, label) {
     const layout = plateLayout(config, Object.keys(values));
     const valueWells = Object.keys(values).filter((well) => Number.isFinite(Number(values[well])));
-    const sparse = isSparsePlate(layout, valueWells.length);
+    const is384Layout = layout.format === 384;
     const usedRows = new Set(valueWells.map((well) => well[0]));
     const usedCols = new Set(valueWells.map((well) => Number(well.slice(1))));
-    const rows = sparse ? layout.rows.filter((row) => usedRows.has(row)) : layout.rows;
-    const cols = sparse ? layout.cols.filter((col) => usedCols.has(col)) : layout.cols;
+    const rows = is384Layout ? layout.rows.filter((row) => usedRows.has(row)) : layout.rows;
+    const cols = is384Layout ? layout.cols.filter((col) => usedCols.has(col)) : layout.cols;
     const cm = 28.3464567;
     const baseCell = layout.format === 384 ? 24 : 34;
-    const cell = sparse ? 1.5 * cm : baseCell;
+    const cell = is384Layout ? 1.5 * cm : baseCell;
     const left = 48;
     const top = 58;
-    const rightPad = sparse ? 48 : 64;
-    const colorbar = sparse ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
+    const rightPad = is384Layout ? 48 : 64;
+    const colorbar = is384Layout ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
     const gridW = cols.length * cell;
     const gridH = rows.length * cell;
-    const minSparseWidth = 520;
-    const width = sparse ? Math.max(minSparseWidth, left + gridW + rightPad) : left + gridW + colorbar.gap + colorbar.w + 64;
-    const height = sparse ? top + gridH + colorbar.gap + colorbar.h + 44 : top + gridH + 52;
-    const gridX = sparse ? (width - gridW) / 2 : left;
+    const min384Width = 520;
+    const width = is384Layout ? Math.max(min384Width, left + gridW + rightPad) : left + gridW + colorbar.gap + colorbar.w + 64;
+    const height = is384Layout ? top + gridH + colorbar.gap + colorbar.h + 44 : top + gridH + 52;
+    const gridX = is384Layout ? (width - gridW) / 2 : left;
     const rowLabelX = gridX - 12;
     const finite = Object.values(values).map(Number).filter(Number.isFinite);
     const min = finite.length ? Math.min(...finite) : 0;
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
     let body = `<rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${sparse ? 11 : 18}" font-weight="700" fill="#111">${esc(title)}</text>`;
+      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${is384Layout ? 11 : 18}" font-weight="700" fill="#111">${esc(title)}</text>`;
     cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": 8, fill: "#444" }, col); });
     rows.forEach((row, r) => {
       body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": 8, fill: "#444" }, row);
@@ -998,13 +994,13 @@
         const value = Number(values[well]);
         const fill = Number.isFinite(value) ? lerpColor(ramp, (value - min) / Math.max(1e-9, max - min)) : "#F2F2F2";
         body += svgEl("rect", { x: gridX + c * cell, y: top + r * cell, width: cell - 1, height: cell - 1, fill, stroke: "#fff", "stroke-width": 0.5 });
-        if (config.plotting.heatmap.show_values && Number.isFinite(value) && (sparse || cell >= 28)) {
-          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": sparse ? 6.5 : 7, fill: "#1F2A24" }, fmt(value, 2));
+        if (config.plotting.heatmap.show_values && Number.isFinite(value) && (is384Layout || cell >= 28)) {
+          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? 6.5 : 7, fill: "#1F2A24" }, fmt(value, 2));
         }
       });
     });
     const segments = 80;
-    if (sparse) {
+    if (is384Layout) {
       const barW = Math.min(Math.max(gridW, 180), width - left * 2);
       const barX = (width - barW) / 2;
       const barY = top + gridH + colorbar.gap;
