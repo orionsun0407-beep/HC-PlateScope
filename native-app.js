@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-21-384-fixed-layout";
+  const APP_VERSION = "2026-08-21-384-paged-report";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -1058,6 +1058,61 @@
     </svg>`;
   }
 
+  function combine384ReportPages(title, gridArgs, heatmap) {
+    const pageW = 841.89;
+    const pageH = 595.28;
+    const cm = 28.3464567;
+    const panelSize = 2.5 * cm;
+    const gap = 4;
+    const marginX = 0;
+    const maxCols = Math.max(1, Math.floor((pageW - marginX * 2 + gap) / (panelSize + gap)));
+    const requestedCols = Math.max(1, Math.min(24, Number(gridArgs.config?.plotting?.spectra_grid?.columns || 12)));
+    if (requestedCols > maxCols) {
+      const error = new Error(`Plots per row = ${requestedCols} 无法在 A4 横版中保持 2.5 cm 单图尺寸。384 孔板报告每行最多建议 ${maxCols} 个；请把 Plots per row 调小后重新运行。`);
+      error.showAlert = true;
+      throw error;
+    }
+    const rowsPerPage = Math.max(1, Math.floor((pageH - 74 + gap) / (panelSize + gap)));
+    const wellsPerPage = requestedCols * rowsPerPage;
+    const pages = [];
+    for (let start = 0; start < gridArgs.wells.length; start += wellsPerPage) {
+      const pageWells = gridArgs.wells.slice(start, start + wellsPerPage);
+      const pageGrid = gridSvg({ ...gridArgs, wells: pageWells, report: true });
+      const gridBox = svgSize(pageGrid);
+      const gridX = (pageW - gridBox.width) / 2;
+      pages.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+        <rect width="100%" height="100%" fill="white"/>
+        <text x="${pageW / 2}" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${esc(title)}</text>
+        <g transform="translate(${gridX.toFixed(2)} 42)">${stripSvg(pageGrid)}</g>
+      </svg>`);
+    }
+    const heatBox = svgSize(heatmap);
+    const heatScale = Math.min(1, (pageW - 48) / heatBox.width, (pageH - 72) / heatBox.height);
+    const heatX = (pageW - heatBox.width * heatScale) / 2;
+    pages.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+      <rect width="100%" height="100%" fill="white"/>
+      <text x="${pageW / 2}" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${esc(title)}</text>
+      <g transform="translate(${heatX.toFixed(2)} 48) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
+    </svg>`);
+    return { pages, previewSvg: stackedPreviewSvg(pages) };
+  }
+
+  function stackedPreviewSvg(pages) {
+    const boxes = pages.map(svgSize);
+    const width = Math.max(...boxes.map((box) => box.width));
+    const gap = 18;
+    const height = boxes.reduce((sum, box) => sum + box.height, 0) + gap * Math.max(0, boxes.length - 1);
+    let y = 0;
+    const body = pages.map((page, idx) => {
+      const box = boxes[idx];
+      const x = (width - box.width) / 2;
+      const out = `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)})"><rect x="0" y="0" width="${box.width}" height="${box.height}" fill="white" stroke="#E1E7E3" stroke-width="1"/>${stripSvg(page)}</g>`;
+      y += box.height + gap;
+      return out;
+    }).join("");
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
+  }
+
   function svgSize(svg) {
     const w = Number((svg.match(/width="([\d.]+)"/) || [0, 1000])[1]);
     const h = Number((svg.match(/height="([\d.]+)"/) || [0, 700])[1]);
@@ -1204,6 +1259,17 @@
   async function svgToPdfBytes(svg, options = {}) {
     await ensureVectorPdfLibraries();
     const { jsPDF } = window.jspdf;
+    if (Array.isArray(svg)) {
+      const first = svgSize(svg[0]);
+      const pdf = new jsPDF({ orientation: first.width > first.height ? "landscape" : "portrait", unit: "pt", format: [first.width, first.height] });
+      for (let i = 0; i < svg.length; i += 1) {
+        const pageSvg = svg[i];
+        const { width, height } = svgSize(pageSvg);
+        if (i > 0) pdf.addPage([width, height], width > height ? "landscape" : "portrait");
+        await drawSvgVector(pdf, pageSvg, { x: 0, y: 0, width, height });
+      }
+      return pdf.output("arraybuffer");
+    }
     const { width, height } = svgSize(svg);
     if (options.forcePortrait) {
       const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
@@ -1336,8 +1402,10 @@
   }
 
   async function addFigureFiles(files, basePath, svg) {
-    const forcePortrait = basePath.startsWith("report/") && basePath.includes("combined_report");
-    files.push({ path: `${basePath}.pdf`, bytes: await svgToPdfBytes(svg, { forcePortrait }), previewSvg: svg });
+    const forcePortrait = basePath.startsWith("report/") && basePath.includes("combined_report") && !svg?.pages;
+    const pdfSource = svg?.pages || svg;
+    const previewSvg = svg?.previewSvg || svg;
+    files.push({ path: `${basePath}.pdf`, bytes: await svgToPdfBytes(pdfSource, { forcePortrait }), previewSvg });
   }
 
   function selectedWellSeries(result) {
@@ -1443,7 +1511,10 @@
     const grid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights });
     const reportGrid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true });
     const heatSvg = heatmapSvg(heat, config, is384 ? "GECO 384 paired max(with CA) / max(without CA)" : "GECO max(with ca) / max(without ca)", "ratio");
-    const reportSvg = combineReportSvg(is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap", reportGrid, heatSvg);
+    const reportTitle = is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap";
+    const reportSvg = is384
+      ? combine384ReportPages(reportTitle, { title: "GECO 384 paired spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights }, heatSvg)
+      : combineReportSvg(reportTitle, reportGrid, heatSvg);
     const files = [{ path: "tables/GECO_peak_ratio.xlsx", bytes: rowsToXlsxBytes(summary, "peak_ratio") }];
     await addFigureFiles(files, "figures/GECO_grid_plots", grid);
     await addFigureFiles(files, "figures/GECO_heatmap", heatSvg);
