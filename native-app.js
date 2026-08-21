@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-21-384-paged-report";
+  const APP_VERSION = "2026-08-21-384-portrait-pages";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -1059,8 +1059,8 @@
   }
 
   function combine384ReportPages(title, gridArgs, heatmap) {
-    const pageW = 841.89;
-    const pageH = 595.28;
+    const pageW = 595.28;
+    const pageH = 841.89;
     const cm = 28.3464567;
     const panelSize = 2.5 * cm;
     const gap = 4;
@@ -1068,7 +1068,7 @@
     const maxCols = Math.max(1, Math.floor((pageW - marginX * 2 + gap) / (panelSize + gap)));
     const requestedCols = Math.max(1, Math.min(24, Number(gridArgs.config?.plotting?.spectra_grid?.columns || 12)));
     if (requestedCols > maxCols) {
-      const error = new Error(`Plots per row = ${requestedCols} 无法在 A4 横版中保持 2.5 cm 单图尺寸。384 孔板报告每行最多建议 ${maxCols} 个；请把 Plots per row 调小后重新运行。`);
+      const error = new Error(`Plots per row = ${requestedCols} 无法在 A4 竖版中保持 2.5 cm 单图尺寸。384 孔板竖版报告每行最多建议 ${maxCols} 个；请把 Plots per row 调小后重新运行。`);
       error.showAlert = true;
       throw error;
     }
