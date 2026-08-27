@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-22-384-print-fit";
+  const APP_VERSION = "2026-08-27-384-combine-when-fit";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -1074,6 +1074,23 @@
       throw error;
     }
     const gridY = 8;
+    const heatBox = svgSize(heatmap);
+    const fullGrid = gridSvg({ ...gridArgs, report: true });
+    const fullGridBox = svgSize(fullGrid);
+    const fullGridX = (pageW - fullGridBox.width) / 2;
+    const singleGap = 10;
+    const heatXSingle = (pageW - heatBox.width) / 2;
+    const heatYSingle = gridY + fullGridBox.height + singleGap;
+    const canFitSinglePage = fullGridX >= 0 && heatXSingle >= 0 && heatYSingle + heatBox.height <= pageH - 8;
+    if (canFitSinglePage) {
+      const page = `<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+        <rect width="100%" height="100%" fill="white"/>
+        <g transform="translate(${fullGridX.toFixed(2)} ${gridY})">${stripSvg(fullGrid)}</g>
+        <g transform="translate(${heatXSingle.toFixed(2)} ${heatYSingle.toFixed(2)})">${stripSvg(heatmap)}</g>
+      </svg>`;
+      return { pages: [page], previewSvg: stackedPreviewSvg([page]) };
+    }
+
     const rowsPerPage = Math.max(1, Math.floor((pageH - gridY - 24 + gap) / (panelSize + gap)));
     const wellsPerPage = requestedCols * rowsPerPage;
     const pages = [];
@@ -1087,7 +1104,6 @@
         <g transform="translate(${gridX.toFixed(2)} ${gridY})">${stripSvg(pageGrid)}</g>
       </svg>`);
     }
-    const heatBox = svgSize(heatmap);
     const heatScale = Math.min(1, (pageW - 48) / heatBox.width, (pageH - 28) / heatBox.height);
     const heatX = (pageW - heatBox.width * heatScale) / 2;
     const heatY = (pageH - heatBox.height * heatScale) / 2;
