@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-08-27-384-combine-when-fit";
+  const APP_VERSION = "2026-09-01-384-report-fonts";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -850,13 +850,13 @@
       const gx = sx(tick);
       grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : compact ? 0.55 : 0.5 }));
       grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + (compact ? 1.5 : 3), stroke: "#333", "stroke-width": report384 ? 0.62 : compact ? 0.42 : 0.58 }));
-      grid.push(svgEl("text", { x: gx + 0.7, y: y + height - (compact ? 3.5 : 6), "font-size": report384 ? 3.8 : compact ? 3.3 : 6.0, "font-weight": report384 ? "800" : "700", fill: "#333", transform: `rotate(-90 ${gx + 0.7} ${y + height - (compact ? 3.5 : 6)})` }, fmt(tick, 0)));
+      grid.push(svgEl("text", { x: gx + 0.7, y: y + height - (compact ? 3.5 : 6), "font-size": report384 ? 4.2 : compact ? 3.3 : 6.0, "font-weight": report384 ? "900" : "700", fill: "#333", transform: `rotate(-90 ${gx + 0.7} ${y + height - (compact ? 3.5 : 6)})` }, fmt(tick, 0)));
     }
     for (const tick of yTicks) {
       const gy = sy(tick);
       grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : compact ? 0.55 : 0.5 }));
       grid.push(svgEl("line", { x1: x + pad.l - (compact ? 1.5 : 3), y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": report384 ? 0.62 : compact ? 0.42 : 0.58 }));
-      grid.push(svgEl("text", { x: x + pad.l - (compact ? 2.4 : 5), y: gy + (compact ? 1.1 : 2), "text-anchor": "end", "font-size": report384 ? 4.0 : compact ? 3.5 : 6.2, "font-weight": report384 ? "800" : "700", fill: "#333" }, fmt(tick, tick >= 10 ? 0 : 1)));
+      grid.push(svgEl("text", { x: x + pad.l - (compact ? 2.4 : 5), y: gy + (compact ? 1.1 : 2), "text-anchor": "end", "font-size": report384 ? 4.2 : compact ? 3.5 : 6.2, "font-weight": report384 ? "900" : "700", fill: "#333" }, fmt(tick, tick >= 10 ? 0 : 1)));
     }
     if (!ticks.length) {
       for (let i = 0; i <= 4; i += 1) {
@@ -881,7 +881,7 @@
     const badgeX = x + width - badgeW - (compact ? 2 : 8);
     const badgeY = y + (report384 ? 1.1 : compact ? 1.5 : 18);
     const badgeSvg = badge ? svgEl("rect", { x: badgeX, y: badgeY, width: badgeW, height: badgeH, rx: compact ? 1.2 : 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
-      svgEl("text", { x: badgeX + badgeW / 2, y: badgeY + (report384 ? 5.2 : compact ? 4.4 : 10.5), "text-anchor": "middle", "font-size": report384 ? 4.6 : compact ? 3.8 : 7.8, "font-weight": report384 ? "900" : "800", fill: "white" }, badge.text) : "";
+      svgEl("text", { x: badgeX + badgeW / 2, y: badgeY + (report384 ? 5.3 : compact ? 4.4 : 10.5), "text-anchor": "middle", "font-size": report384 ? 5.1 : compact ? 3.8 : 7.8, "font-weight": report384 ? "900" : "800", fill: "white" }, badge.text) : "";
     const titleAttrs = compact
       ? { x: x + 3, y: y + 5.2, "text-anchor": "start" }
       : moduleKey === "geco"
@@ -893,7 +893,7 @@
       svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": report384 ? 0.78 : compact ? 0.55 : 0.9 }),
       svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": report384 ? 0.78 : compact ? 0.55 : 0.9 }),
       ...plots,
-      svgEl("text", { ...titleAttrs, "font-size": report384 ? 6.1 : compact ? 5.2 : 9, "font-weight": report384 ? "900" : "800", fill: "#333" }, title || well),
+      svgEl("text", { ...titleAttrs, "font-size": report384 ? 6.6 : compact ? 5.2 : 9, "font-weight": report384 ? "900" : "800", fill: "#333" }, title || well),
       badgeSvg,
     ].join(""));
   }
@@ -953,9 +953,9 @@
     }).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-size="${report ? 9 : 18}" font-weight="800" fill="#111">${esc(title)}</text>
+      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-size="${is384Report ? 11 : report ? 9 : 18}" font-weight="${is384Report ? 900 : 800}" fill="#111">${esc(title)}</text>
       ${panels}
-      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${report ? 6 : 10}" font-weight="700" fill="#333">Wavelength (nm)</text>
+      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${is384Report ? 7 : report ? 6 : 10}" font-weight="${is384Report ? 900 : 700}" fill="#333">Wavelength (nm)</text>
     </svg>`;
   }
 
@@ -985,18 +985,19 @@
     const min = finite.length ? Math.min(...finite) : 0;
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
+    const heat384TextSize = 9.2;
     let body = `<rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${is384Layout ? 11 : 18}" font-weight="700" fill="#111">${esc(title)}</text>`;
-    cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": 8, fill: "#444" }, col); });
+      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${is384Layout ? 11 : 18}" font-weight="${is384Layout ? 900 : 700}" fill="#111">${esc(title)}</text>`;
+    cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, col); });
     rows.forEach((row, r) => {
-      body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": 8, fill: "#444" }, row);
+      body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, row);
       cols.forEach((col, c) => {
         const well = `${row}${String(col).padStart(2, "0")}`;
         const value = Number(values[well]);
         const fill = Number.isFinite(value) ? lerpColor(ramp, (value - min) / Math.max(1e-9, max - min)) : "#F2F2F2";
         body += svgEl("rect", { x: gridX + c * cell, y: top + r * cell, width: cell - 1, height: cell - 1, fill, stroke: "#fff", "stroke-width": 0.5 });
         if (config.plotting.heatmap.show_values && Number.isFinite(value) && (is384Layout || cell >= 28)) {
-          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? 8.2 : 7, "font-weight": is384Layout ? "900" : "400", fill: "#1F2A24" }, fmt(value, 2));
+          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 7, "font-weight": is384Layout ? "900" : "400", fill: "#1F2A24" }, fmt(value, 2));
         }
       });
     });
@@ -1015,9 +1016,9 @@
       tickValues.forEach((value, idx) => {
         const xTick = idx === 0 ? barX : idx === 1 ? barX + barW / 2 : barX + barW;
         body += svgEl("line", { x1: xTick, y1: barY + colorbar.h, x2: xTick, y2: barY + colorbar.h + 4, stroke: "#444", "stroke-width": 0.45 });
-        body += svgEl("text", { x: xTick, y: barY + colorbar.h + 13, "text-anchor": "middle", "font-size": 7, fill: "#444" }, fmt(value, 2));
+        body += svgEl("text", { x: xTick, y: barY + colorbar.h + 13, "text-anchor": "middle", "font-size": 8.2, "font-weight": "800", fill: "#333" }, fmt(value, 2));
       });
-      body += svgEl("text", { x: width / 2, y: height - 8, "text-anchor": "middle", "font-size": 8, fill: "#444" }, esc(label));
+      body += svgEl("text", { x: width / 2, y: height - 8, "text-anchor": "middle", "font-size": heat384TextSize, "font-weight": "900", fill: "#333" }, esc(label));
     } else {
       const barX = gridX + gridW + colorbar.gap;
       const barY = top;
