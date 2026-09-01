@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-09-01-384-report-fonts";
+  const APP_VERSION = "2026-09-01-384-combined-title-align";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -921,6 +921,7 @@
     const basePanelH = report ? 57 : 100;
     const panelW = is384Report ? report384PanelSize : basePanelW;
     const panelH = is384Report ? report384PanelSize : basePanelH;
+    const titleFontFamily = config.plotting?.font_family || "Arial";
     const rows = Math.ceil(pageWells.length / ncols);
     const width = left * 2 + ncols * panelW + Math.max(0, ncols - 1) * gap;
     const height = top + rows * Math.max(basePanelH, panelH) + Math.max(0, rows - 1) * gap + (report ? 10 : 26);
@@ -953,7 +954,7 @@
     }).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-size="${is384Report ? 11 : report ? 9 : 18}" font-weight="${is384Report ? 900 : 800}" fill="#111">${esc(title)}</text>
+      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Report ? 11 : report ? 9 : 18}" font-weight="${is384Report ? 900 : 800}" font-style="normal" fill="#111">${esc(title)}</text>
       ${panels}
       <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${is384Report ? 7 : report ? 6 : 10}" font-weight="${is384Report ? 900 : 700}" fill="#333">Wavelength (nm)</text>
     </svg>`;
@@ -970,9 +971,10 @@
     const cm = 28.3464567;
     const baseCell = layout.format === 384 ? 24 : 34;
     const cell = is384Layout ? 1.5 * cm : baseCell;
-    const left = 48;
+    const sidePad384 = 42;
+    const left = is384Layout ? sidePad384 : 48;
     const top = 58;
-    const rightPad = is384Layout ? 48 : 64;
+    const rightPad = is384Layout ? sidePad384 : 64;
     const colorbar = is384Layout ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
     const gridW = cols.length * cell;
     const gridH = rows.length * cell;
@@ -986,8 +988,9 @@
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
     const heat384TextSize = 9.2;
+    const titleFontFamily = config.plotting?.font_family || "Arial";
     let body = `<rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="26" text-anchor="middle" font-size="${is384Layout ? 11 : 18}" font-weight="${is384Layout ? 900 : 700}" fill="#111">${esc(title)}</text>`;
+      <text x="${width / 2}" y="26" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Layout ? 11 : 18}" font-weight="${is384Layout ? 900 : 700}" font-style="normal" fill="#111">${esc(title)}</text>`;
     cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, col); });
     rows.forEach((row, r) => {
       body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, row);
