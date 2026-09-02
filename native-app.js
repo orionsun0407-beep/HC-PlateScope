@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-09-02-96-report-layout";
+  const APP_VERSION = "2026-09-03-plate-layout-margins";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -901,39 +901,55 @@
   function gridSvg({ title, tables, labels, wells, config, normalized = false, moduleKey = "", highlights = {}, report = false, report96 = false, showTitle = true }) {
     const layout = config.plotting.spectra_grid || {};
     const plate = plateLayout(config, wells);
-    const is384Report = report && plate.format === 384;
-    const is96Report = report && report96 && plate.format === 96;
+    const compactLayout = String(layout.mode || "plate").toLowerCase() === "compact";
+    const measured384PlateLayout = plate.format === 384 && !compactLayout && moduleKey === "geco";
+    const is384Report = report && plate.format === 384 && compactLayout;
+    const isPlateStyleReport = report && report96 && (plate.format === 96 || measured384PlateLayout);
     const configuredCols = Math.max(1, Math.min(24, Number(layout.columns || 12)));
-    const baseCols = is384Report || layout.mode === "compact" ? configuredCols : plate.cols.length;
     const cm = 28.3464567;
     const report384PanelSize = 2.1 * cm;
     const report384MaxCols = 12;
     const pageWells = wells.slice();
-    const gap = report ? (is384Report ? 4 : is96Report ? 0.6 : 1.5) : 14;
-    const left = report ? (is96Report ? 1.2 : 4) : 22;
-    const top = report ? (is96Report ? 8 : 18) : 48;
-    if (is384Report && baseCols > report384MaxCols) {
-      const error = new Error(`Plots per row = ${baseCols} 放进 PDF 后会让单个散点图过小。384 孔板报告每行最多建议 ${report384MaxCols} 个；请把 Plots per row 调小后重新运行。`);
+    const gap = report ? (is384Report ? 4 : isPlateStyleReport ? 0.6 : 1.5) : 14;
+    const left = report ? (isPlateStyleReport ? 1.2 : 4) : 22;
+    const top = report ? (isPlateStyleReport ? 8 : 18) : 48;
+    if (is384Report && configuredCols > report384MaxCols) {
+      const error = new Error(`Plots per row = ${configuredCols} 放进 PDF 后会让单个散点图过小。384 孔板 Compact 报告每行最多建议 ${report384MaxCols} 个；请把 Plots per row 调小后重新运行。`);
       error.showAlert = true;
       throw error;
     }
-    const ncols = baseCols;
-    const basePanelW = report ? (is96Report ? 49 : 48) : 128;
-    const basePanelH = report ? (is96Report ? 61 : 57) : 100;
+    let ncols;
+    let rows;
+    let positions;
+    if (measured384PlateLayout) {
+      const activeRows = plate.rows.filter((row) => pageWells.some((well) => well[0] === row));
+      const activePairCols = [...new Set(pageWells.map((well) => Math.ceil(Number(well.slice(1)) / 2)))].sort((a, b) => a - b);
+      ncols = Math.max(1, activePairCols.length);
+      rows = Math.max(1, activeRows.length);
+      positions = new Map(pageWells.map((well) => [well, {
+        row: activeRows.indexOf(well[0]),
+        col: activePairCols.indexOf(Math.ceil(Number(well.slice(1)) / 2)),
+      }]));
+    } else {
+      ncols = compactLayout ? configuredCols : plate.cols.length;
+      rows = Math.max(1, Math.ceil(pageWells.length / ncols));
+      positions = new Map(pageWells.map((well, idx) => [well, { row: Math.floor(idx / ncols), col: idx % ncols }]));
+    }
+    const basePanelW = report ? (isPlateStyleReport ? 49 : 48) : 128;
+    const basePanelH = report ? (isPlateStyleReport ? 61 : 57) : 100;
     const panelW = is384Report ? report384PanelSize : basePanelW;
     const panelH = is384Report ? report384PanelSize : basePanelH;
     const titleFontFamily = config.plotting?.font_family || "Arial";
-    const rows = Math.ceil(pageWells.length / ncols);
     const width = left * 2 + ncols * panelW + Math.max(0, ncols - 1) * gap;
-    const height = top + rows * Math.max(basePanelH, panelH) + Math.max(0, rows - 1) * gap + (report ? 10 : 26);
+    const height = top + rows * panelH + Math.max(0, rows - 1) * gap + (report ? 10 : 26);
     const colors = [config.plotting.colors.primary, config.plotting.colors.secondary];
     const panels = pageWells.map((well, idx) => {
-      const col = idx % ncols;
-      const row = Math.floor(idx / ncols);
+      const position = positions.get(well) || { row: Math.floor(idx / ncols), col: idx % ncols };
+      const { row, col } = position;
       const rowStart = row * ncols;
       const wellsInRow = Math.min(ncols, pageWells.length - rowStart);
       const rowW = wellsInRow * panelW + Math.max(0, wellsInRow - 1) * gap;
-      const rowOffset = is384Report ? (width - left * 2 - rowW) / 2 : 0;
+      const rowOffset = is384Report && compactLayout ? (width - left * 2 - rowW) / 2 : 0;
       return wellPanelSvg({
         tables,
         labels,
@@ -951,14 +967,14 @@
         normalized,
         moduleKey,
         report384: is384Report,
-        report96: is96Report,
+        report96: isPlateStyleReport,
       });
     }).join("");
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"${is96Report ? ` font-family="${esc(titleFontFamily)}"` : ""}>
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"${isPlateStyleReport ? ` font-family="${esc(titleFontFamily)}"` : ""}>
       <rect width="100%" height="100%" fill="white"/>
       ${showTitle ? `<text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Report ? 11 : report ? 9 : 18}" font-weight="${is384Report ? 900 : 800}" font-style="normal" fill="#111">${esc(title)}</text>` : ""}
       ${panels}
-      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${is384Report ? 7 : is96Report ? 7 : report ? 6 : 10}" font-weight="${is384Report || is96Report ? 900 : 700}" fill="#333">Wavelength (nm)</text>
+      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${is384Report ? 7 : isPlateStyleReport ? 7 : report ? 6 : 10}" font-weight="${is384Report || isPlateStyleReport ? 900 : 700}" fill="#333">Wavelength (nm)</text>
     </svg>`;
   }
 
@@ -975,9 +991,9 @@
     const cell = is384Layout ? 1.5 * cm : baseCell;
     const sidePad384 = 42;
     const left = is384Layout ? sidePad384 : 48;
-    const report96 = options.report96 === true && !is384Layout;
+    const reportPlate = options.reportPlate === true || (options.report96 === true && !is384Layout);
     const showTitle = options.showTitle !== false;
-    const top = report96 ? 24 : 58;
+    const top = reportPlate ? 24 : 58;
     const rightPad = is384Layout ? sidePad384 : 64;
     const colorbar = is384Layout ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
     const gridW = cols.length * cell;
@@ -1072,16 +1088,18 @@
     const heatBox = svgSize(heatmap);
     const width = 595.28;
     const height = 841.89;
+    const marginX = 28.3464567;
+    const contentWidth = width - marginX * 2;
     const titleSize = 12;
     const titleWeight = 900;
     const gridY = 18;
-    const gridScale = Math.min(1, width / gridBox.width, 515 / gridBox.height);
-    const gridX = (width - gridBox.width * gridScale) / 2;
+    const gridScale = Math.min(1, contentWidth / gridBox.width, 515 / gridBox.height);
+    const gridX = marginX + (contentWidth - gridBox.width * gridScale) / 2;
     const gridBottom = gridY + gridBox.height * gridScale;
     const heatTitleY = gridBottom + 22;
     const heatY = heatTitleY + 8;
-    const heatScale = Math.min(1, (width - 36) / heatBox.width, (height - heatY - 8) / heatBox.height);
-    const heatX = (width - heatBox.width * heatScale) / 2;
+    const heatScale = Math.min(1, contentWidth / heatBox.width, (height - heatY - 8) / heatBox.height);
+    const heatX = marginX + (contentWidth - heatBox.width * heatScale) / 2;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="white"/>
       <text x="${width / 2}" y="14" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(spectraTitle)}</text>
@@ -1560,11 +1578,13 @@
     const grid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights });
     const spectraTitle = is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well";
     const heatmapTitle = is384 ? "GECO 384 paired max(with CA) / max(without CA)" : "GECO max(with CA) / max(without CA)";
-    const reportGrid = gridSvg({ title: spectraTitle, tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true, report96: !is384, showTitle: is384 });
+    const compact384 = is384 && String(config.plotting?.spectra_grid?.mode || "plate").toLowerCase() === "compact";
+    const plateStyleReport = !compact384;
+    const reportGrid = gridSvg({ title: spectraTitle, tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true, report96: plateStyleReport, showTitle: compact384 });
     const heatSvg = heatmapSvg(heat, config, heatmapTitle, "ratio");
-    const reportHeatSvg = is384 ? heatSvg : heatmapSvg(heat, config, heatmapTitle, "ratio", { report96: true, showTitle: false });
+    const reportHeatSvg = compact384 ? heatSvg : heatmapSvg(heat, config, heatmapTitle, "ratio", { reportPlate: true, showTitle: false });
     const reportTitle = is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap";
-    const reportSvg = is384
+    const reportSvg = compact384
       ? combine384ReportPages(reportTitle, { title: "GECO 384 paired spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights }, heatSvg)
       : combine96ReportSvg(reportGrid, reportHeatSvg, { spectraTitle, heatmapTitle, fontFamily: config.plotting?.font_family || "Arial" });
     const files = [{ path: "tables/GECO_peak_ratio.xlsx", bytes: rowsToXlsxBytes(summary, "peak_ratio") }];
@@ -1802,7 +1822,7 @@
     return `<div class="hc-streamlit-controls">
       ${controlField("Plate format", `<select id="${module}_plate">${manualOnly ? "" : `<option value="auto">Auto-detect</option>`}<option value="96">96-well</option><option value="384">384-well</option></select>`, "Choose the plate layout used by this analysis.")}
       ${controlField("Scatter plot arrangement", `<select id="${module}_spectra_mode"><option value="plate">Plate layout</option><option value="compact">Compact</option></select>`, "Arrange spectra by plate location or compact rows.")}
-      <div class="hc-control-row two">
+      <div class="hc-control-row two" id="${module}_compact_controls">
         ${controlField("Plots per row", `<input id="${module}_spectra_columns" type="number" min="4" max="24" value="${cfg.plotting.spectra_grid.columns}">`, "Number of small plots shown in each row.")}
         ${controlField("Rows per PDF page", `<input id="${module}_rows_page" type="number" min="2" max="16" value="${cfg.plotting.spectra_grid.rows_per_page}">`, "Number of plot rows placed on each PDF page.")}
       </div>
@@ -1916,6 +1936,11 @@
 
   function wireModuleControls(module) {
     const plate = $(`${module}_plate`);
+    const spectraMode = $(`${module}_spectra_mode`);
+    const compactControls = $(`${module}_compact_controls`);
+    const syncSpectraControls = () => compactControls?.classList.toggle("hidden", spectraMode?.value !== "compact");
+    spectraMode?.addEventListener("change", syncSpectraControls);
+    syncSpectraControls();
     if (plate) {
       plate.value = module === "geco" ? "96" : String(plateFormatFromConfig(state.config));
       plate.addEventListener("change", () => {
