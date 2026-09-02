@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-09-01-384-combined-title-align";
+  const APP_VERSION = "2026-09-02-96-report-layout";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -821,7 +821,7 @@
     return ticks;
   }
 
-  function wellPanelSvg({ tables, labels, colors, well, title, x, y, width, height, smooth = true, windowLength = 9, badge, config = DEFAULT_CONFIG, normalized = false, moduleKey = "", report384 = false }) {
+  function wellPanelSvg({ tables, labels, colors, well, title, x, y, width, height, smooth = true, windowLength = 9, badge, config = DEFAULT_CONFIG, normalized = false, moduleKey = "", report384 = false, report96 = false }) {
     const compact = width < 80 || height < 80;
     const pad = compact ? { l: 12, r: 3, t: 9, b: 12 } : { l: 32, r: 10, t: 18, b: 36 };
     const innerW = width - pad.l - pad.r;
@@ -840,33 +840,33 @@
     }
     const sx = (v) => x + pad.l + ((v - range.xmin) / Math.max(1e-9, range.xmax - range.xmin)) * innerW;
     const sy = (v) => y + pad.t + innerH - ((v - range.ymin) / Math.max(1e-9, range.ymax - range.ymin)) * innerH;
-    const markerRadius = compact ? Math.max(0.42, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * (report384 ? 0.52 : 0.48)) : Math.max(0.85, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.78);
-    const lineWidth = compact ? Math.max(report384 ? 1.05 : 0.62, Number(config.plot?.line_width || config.plotting?.line_width || 1) * (report384 ? 1.05 : 0.82)) : Math.max(0.95, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 1.15);
+    const markerRadius = compact ? Math.max(0.42, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * (report384 ? 0.52 : report96 ? 0.55 : 0.48)) : Math.max(0.85, Math.sqrt(Number(config.plot?.marker_size || config.plotting?.marker_size || 1)) * 0.78);
+    const lineWidth = compact ? Math.max(report384 ? 1.05 : report96 ? 1.0 : 0.62, Number(config.plot?.line_width || config.plotting?.line_width || 1) * (report384 ? 1.05 : report96 ? 1.0 : 0.82)) : Math.max(0.95, Number(config.plot?.line_width || config.plotting?.line_width || 1) * 1.15);
     const markerAlpha = Number(config.plot?.marker_alpha || config.plotting?.alpha || 0.55);
     const lineAlpha = Number(config.plot?.line_alpha || config.plotting?.line_alpha || 0.95);
     const grid = [];
     const yTicks = [0, range.ymax / 2, range.ymax];
     for (const tick of ticks) {
       const gx = sx(tick);
-      grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : compact ? 0.55 : 0.5 }));
-      grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + (compact ? 1.5 : 3), stroke: "#333", "stroke-width": report384 ? 0.62 : compact ? 0.42 : 0.58 }));
-      grid.push(svgEl("text", { x: gx + 0.7, y: y + height - (compact ? 3.5 : 6), "font-size": report384 ? 4.2 : compact ? 3.3 : 6.0, "font-weight": report384 ? "900" : "700", fill: "#333", transform: `rotate(-90 ${gx + 0.7} ${y + height - (compact ? 3.5 : 6)})` }, fmt(tick, 0)));
+      grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : report96 ? 0.65 : compact ? 0.55 : 0.5 }));
+      grid.push(svgEl("line", { x1: gx, y1: y + pad.t + innerH, x2: gx, y2: y + pad.t + innerH + (compact ? 1.5 : 3), stroke: "#333", "stroke-width": report384 ? 0.62 : report96 ? 0.68 : compact ? 0.42 : 0.58 }));
+      grid.push(svgEl("text", { x: gx + 0.7, y: y + height - (compact ? 3.5 : 6), "font-size": report384 ? 4.2 : report96 ? 3.8 : compact ? 3.3 : 6.0, "font-weight": report384 || report96 ? "900" : "700", fill: "#333", transform: `rotate(-90 ${gx + 0.7} ${y + height - (compact ? 3.5 : 6)})` }, fmt(tick, 0)));
     }
     for (const tick of yTicks) {
       const gy = sy(tick);
-      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : compact ? 0.55 : 0.5 }));
-      grid.push(svgEl("line", { x1: x + pad.l - (compact ? 1.5 : 3), y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": report384 ? 0.62 : compact ? 0.42 : 0.58 }));
-      grid.push(svgEl("text", { x: x + pad.l - (compact ? 2.4 : 5), y: gy + (compact ? 1.1 : 2), "text-anchor": "end", "font-size": report384 ? 4.2 : compact ? 3.5 : 6.2, "font-weight": report384 ? "900" : "700", fill: "#333" }, fmt(tick, tick >= 10 ? 0 : 1)));
+      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : report96 ? 0.65 : compact ? 0.55 : 0.5 }));
+      grid.push(svgEl("line", { x1: x + pad.l - (compact ? 1.5 : 3), y1: gy, x2: x + pad.l, y2: gy, stroke: "#333", "stroke-width": report384 ? 0.62 : report96 ? 0.68 : compact ? 0.42 : 0.58 }));
+      grid.push(svgEl("text", { x: x + pad.l - (compact ? 2.4 : 5), y: gy + (compact ? 1.1 : 2), "text-anchor": "end", "font-size": report384 ? 4.2 : report96 ? 4.0 : compact ? 3.5 : 6.2, "font-weight": report384 || report96 ? "900" : "700", fill: "#333" }, fmt(tick, tick >= 10 ? 0 : 1)));
     }
     if (!ticks.length) {
       for (let i = 0; i <= 4; i += 1) {
         const gx = x + pad.l + innerW * i / 4;
-        grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : compact ? 0.55 : 0.5 }));
+        grid.push(svgEl("line", { x1: gx, y1: y + pad.t, x2: gx, y2: y + pad.t + innerH, stroke: "#EAEAEA", "stroke-width": report384 ? 0.75 : report96 ? 0.65 : compact ? 0.55 : 0.5 }));
       }
     }
     for (let i = 0; i <= 4; i += 1) {
       const gy = y + pad.t + innerH * i / 4;
-      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#F2F2F2", "stroke-width": report384 ? 0.58 : compact ? 0.42 : 0.38 }));
+      grid.push(svgEl("line", { x1: x + pad.l, y1: gy, x2: x + pad.l + innerW, y2: gy, stroke: "#F2F2F2", "stroke-width": report384 ? 0.58 : report96 ? 0.52 : compact ? 0.42 : 0.38 }));
     }
     const plots = [];
     tables.forEach((table, idx) => {
@@ -876,12 +876,12 @@
       const d = pts.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(2)} ${sy(yValues[i]).toFixed(2)}`).join(" ");
       plots.push(svgEl("path", { d, fill: "none", stroke: colors[idx], "stroke-width": lineWidth.toFixed(2), opacity: lineAlpha }));
     });
-    const badgeW = report384 ? 20 : compact ? 18 : 40;
-    const badgeH = report384 ? 7 : compact ? 6 : 14;
+    const badgeW = report384 ? 20 : report96 ? 19 : compact ? 18 : 40;
+    const badgeH = report384 ? 7 : report96 ? 6.5 : compact ? 6 : 14;
     const badgeX = x + width - badgeW - (compact ? 2 : 8);
-    const badgeY = y + (report384 ? 1.1 : compact ? 1.5 : 18);
+    const badgeY = y + (report384 ? 1.1 : report96 ? 1.0 : compact ? 1.5 : 18);
     const badgeSvg = badge ? svgEl("rect", { x: badgeX, y: badgeY, width: badgeW, height: badgeH, rx: compact ? 1.2 : 2.5, fill: badge.color || "#42949E", opacity: 0.92 }) +
-      svgEl("text", { x: badgeX + badgeW / 2, y: badgeY + (report384 ? 5.3 : compact ? 4.4 : 10.5), "text-anchor": "middle", "font-size": report384 ? 5.1 : compact ? 3.8 : 7.8, "font-weight": report384 ? "900" : "800", fill: "white" }, badge.text) : "";
+      svgEl("text", { x: badgeX + badgeW / 2, y: badgeY + (report384 ? 5.3 : report96 ? 4.9 : compact ? 4.4 : 10.5), "text-anchor": "middle", "font-size": report384 ? 5.1 : report96 ? 4.4 : compact ? 3.8 : 7.8, "font-weight": report384 || report96 ? "900" : "800", fill: "white" }, badge.text) : "";
     const titleAttrs = compact
       ? { x: x + 3, y: y + 5.2, "text-anchor": "start" }
       : moduleKey === "geco"
@@ -890,35 +890,36 @@
     return svgEl("g", {}, [
       svgEl("rect", { x, y, width, height, fill: "white" }),
       ...grid,
-      svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": report384 ? 0.78 : compact ? 0.55 : 0.9 }),
-      svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": report384 ? 0.78 : compact ? 0.55 : 0.9 }),
+      svgEl("line", { x1: x + pad.l, y1: y + pad.t + innerH, x2: x + pad.l + innerW, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": report384 ? 0.78 : report96 ? 0.82 : compact ? 0.55 : 0.9 }),
+      svgEl("line", { x1: x + pad.l, y1: y + pad.t, x2: x + pad.l, y2: y + pad.t + innerH, stroke: "#333", "stroke-width": report384 ? 0.78 : report96 ? 0.82 : compact ? 0.55 : 0.9 }),
       ...plots,
-      svgEl("text", { ...titleAttrs, "font-size": report384 ? 6.6 : compact ? 5.2 : 9, "font-weight": report384 ? "900" : "800", fill: "#333" }, title || well),
+      svgEl("text", { ...titleAttrs, "font-size": report384 ? 6.6 : report96 ? 6.0 : compact ? 5.2 : 9, "font-weight": report384 || report96 ? "900" : "800", fill: "#333" }, title || well),
       badgeSvg,
     ].join(""));
   }
 
-  function gridSvg({ title, tables, labels, wells, config, normalized = false, moduleKey = "", highlights = {}, report = false }) {
+  function gridSvg({ title, tables, labels, wells, config, normalized = false, moduleKey = "", highlights = {}, report = false, report96 = false, showTitle = true }) {
     const layout = config.plotting.spectra_grid || {};
     const plate = plateLayout(config, wells);
     const is384Report = report && plate.format === 384;
+    const is96Report = report && report96 && plate.format === 96;
     const configuredCols = Math.max(1, Math.min(24, Number(layout.columns || 12)));
     const baseCols = is384Report || layout.mode === "compact" ? configuredCols : plate.cols.length;
     const cm = 28.3464567;
     const report384PanelSize = 2.1 * cm;
     const report384MaxCols = 12;
     const pageWells = wells.slice();
-    const gap = report ? (is384Report ? 4 : 1.5) : 14;
-    const left = report ? 4 : 22;
-    const top = report ? 18 : 48;
+    const gap = report ? (is384Report ? 4 : is96Report ? 0.6 : 1.5) : 14;
+    const left = report ? (is96Report ? 1.2 : 4) : 22;
+    const top = report ? (is96Report ? 8 : 18) : 48;
     if (is384Report && baseCols > report384MaxCols) {
       const error = new Error(`Plots per row = ${baseCols} 放进 PDF 后会让单个散点图过小。384 孔板报告每行最多建议 ${report384MaxCols} 个；请把 Plots per row 调小后重新运行。`);
       error.showAlert = true;
       throw error;
     }
     const ncols = baseCols;
-    const basePanelW = report ? 48 : 128;
-    const basePanelH = report ? 57 : 100;
+    const basePanelW = report ? (is96Report ? 49 : 48) : 128;
+    const basePanelH = report ? (is96Report ? 61 : 57) : 100;
     const panelW = is384Report ? report384PanelSize : basePanelW;
     const panelH = is384Report ? report384PanelSize : basePanelH;
     const titleFontFamily = config.plotting?.font_family || "Arial";
@@ -950,17 +951,18 @@
         normalized,
         moduleKey,
         report384: is384Report,
+        report96: is96Report,
       });
     }).join("");
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"${is96Report ? ` font-family="${esc(titleFontFamily)}"` : ""}>
       <rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Report ? 11 : report ? 9 : 18}" font-weight="${is384Report ? 900 : 800}" font-style="normal" fill="#111">${esc(title)}</text>
+      ${showTitle ? `<text x="${width / 2}" y="${report ? 10 : 24}" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Report ? 11 : report ? 9 : 18}" font-weight="${is384Report ? 900 : 800}" font-style="normal" fill="#111">${esc(title)}</text>` : ""}
       ${panels}
-      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${is384Report ? 7 : report ? 6 : 10}" font-weight="${is384Report ? 900 : 700}" fill="#333">Wavelength (nm)</text>
+      <text x="${width / 2}" y="${height - (report ? 2 : 10)}" text-anchor="middle" font-size="${is384Report ? 7 : is96Report ? 7 : report ? 6 : 10}" font-weight="${is384Report || is96Report ? 900 : 700}" fill="#333">Wavelength (nm)</text>
     </svg>`;
   }
 
-  function heatmapSvg(values, config, title, label) {
+  function heatmapSvg(values, config, title, label, options = {}) {
     const layout = plateLayout(config, Object.keys(values));
     const valueWells = Object.keys(values).filter((well) => Number.isFinite(Number(values[well])));
     const is384Layout = layout.format === 384;
@@ -973,7 +975,9 @@
     const cell = is384Layout ? 1.5 * cm : baseCell;
     const sidePad384 = 42;
     const left = is384Layout ? sidePad384 : 48;
-    const top = 58;
+    const report96 = options.report96 === true && !is384Layout;
+    const showTitle = options.showTitle !== false;
+    const top = report96 ? 24 : 58;
     const rightPad = is384Layout ? sidePad384 : 64;
     const colorbar = is384Layout ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
     const gridW = cols.length * cell;
@@ -990,7 +994,7 @@
     const heat384TextSize = 9.2;
     const titleFontFamily = config.plotting?.font_family || "Arial";
     let body = `<rect width="100%" height="100%" fill="white"/>
-      <text x="${width / 2}" y="26" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Layout ? 11 : 18}" font-weight="${is384Layout ? 900 : 700}" font-style="normal" fill="#111">${esc(title)}</text>`;
+      ${showTitle ? `<text x="${width / 2}" y="26" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Layout ? 11 : 18}" font-weight="${is384Layout ? 900 : 700}" font-style="normal" fill="#111">${esc(title)}</text>` : ""}`;
     cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, col); });
     rows.forEach((row, r) => {
       body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, row);
@@ -1060,6 +1064,30 @@
       <text x="${width / 2}" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${esc(title)}</text>
       <g transform="translate(${gridX.toFixed(2)} ${gridRegion.y}) scale(${gridScale.toFixed(5)})">${stripSvg(grid)}</g>
       <g transform="translate(${heatX.toFixed(2)} ${heatRegion.y}) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
+    </svg>`;
+  }
+
+  function combine96ReportSvg(grid, heatmap, { spectraTitle, heatmapTitle, fontFamily = "Arial" }) {
+    const gridBox = svgSize(grid);
+    const heatBox = svgSize(heatmap);
+    const width = 595.28;
+    const height = 841.89;
+    const titleSize = 12;
+    const titleWeight = 900;
+    const gridY = 18;
+    const gridScale = Math.min(1, width / gridBox.width, 515 / gridBox.height);
+    const gridX = (width - gridBox.width * gridScale) / 2;
+    const gridBottom = gridY + gridBox.height * gridScale;
+    const heatTitleY = gridBottom + 22;
+    const heatY = heatTitleY + 8;
+    const heatScale = Math.min(1, (width - 36) / heatBox.width, (height - heatY - 8) / heatBox.height);
+    const heatX = (width - heatBox.width * heatScale) / 2;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="white"/>
+      <text x="${width / 2}" y="14" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(spectraTitle)}</text>
+      <g transform="translate(${gridX.toFixed(2)} ${gridY}) scale(${gridScale.toFixed(5)})">${stripSvg(grid)}</g>
+      <text x="${width / 2}" y="${heatTitleY.toFixed(2)}" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(heatmapTitle)}</text>
+      <g transform="translate(${heatX.toFixed(2)} ${heatY.toFixed(2)}) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
     </svg>`;
   }
 
@@ -1530,12 +1558,15 @@
     const heat = heatmapValues(summary, is384 ? "ratio" : "ratio");
     const highlights = Object.fromEntries(summary.map((row) => [row.well_id, [{ text: fmt(row.ratio, 2), color: config.plotting.badges.geco_ratio }]]));
     const grid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights });
-    const reportGrid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true });
-    const heatSvg = heatmapSvg(heat, config, is384 ? "GECO 384 paired max(with CA) / max(without CA)" : "GECO max(with ca) / max(without ca)", "ratio");
+    const spectraTitle = is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well";
+    const heatmapTitle = is384 ? "GECO 384 paired max(with CA) / max(without CA)" : "GECO max(with CA) / max(without CA)";
+    const reportGrid = gridSvg({ title: spectraTitle, tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true, report96: !is384, showTitle: is384 });
+    const heatSvg = heatmapSvg(heat, config, heatmapTitle, "ratio");
+    const reportHeatSvg = is384 ? heatSvg : heatmapSvg(heat, config, heatmapTitle, "ratio", { report96: true, showTitle: false });
     const reportTitle = is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap";
     const reportSvg = is384
       ? combine384ReportPages(reportTitle, { title: "GECO 384 paired spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights }, heatSvg)
-      : combineReportSvg(reportTitle, reportGrid, heatSvg);
+      : combine96ReportSvg(reportGrid, reportHeatSvg, { spectraTitle, heatmapTitle, fontFamily: config.plotting?.font_family || "Arial" });
     const files = [{ path: "tables/GECO_peak_ratio.xlsx", bytes: rowsToXlsxBytes(summary, "peak_ratio") }];
     await addFigureFiles(files, "figures/GECO_grid_plots", grid);
     await addFigureFiles(files, "figures/GECO_heatmap", heatSvg);
