@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-09-03-plate-layout-margins";
+  const APP_VERSION = "2026-09-04-384-fit-then-paginate";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -1109,6 +1109,68 @@
     </svg>`;
   }
 
+  function combine384PlateReportPages(gridArgs, heatmap, { spectraTitle, heatmapTitle, fontFamily = "Arial" }) {
+    const pageW = 595.28;
+    const pageH = 841.89;
+    const cm = 28.3464567;
+    const marginX = cm;
+    const contentWidth = pageW - marginX * 2;
+    const titleSize = 12;
+    const titleWeight = 900;
+    const gridY = 18;
+    const panelW = 49;
+    const panelH = 61;
+    const gap = 0.6;
+    const full96GridWidth = 1.2 * 2 + 12 * panelW + 11 * gap;
+    const gridScale = Math.min(1, contentWidth / full96GridWidth);
+    const gridFixedHeight = 8 + 10 - gap;
+    const rowsPerPage = Math.max(1, Math.floor(((pageH - gridY - 8) / gridScale - gridFixedHeight) / (panelH + gap)));
+    const plate = plateLayout(gridArgs.config, gridArgs.wells);
+    const activeRows = plate.rows.filter((row) => gridArgs.wells.some((well) => well[0] === row));
+    const fullGrid = gridSvg({ ...gridArgs, report: true, report96: true, showTitle: false });
+    const fullGridBox = svgSize(fullGrid);
+    const fullGridX = marginX + (contentWidth - fullGridBox.width * gridScale) / 2;
+    const heatBox = svgSize(heatmap);
+    const heatScale = Math.min(1, contentWidth / heatBox.width);
+    const heatX = marginX + (contentWidth - heatBox.width * heatScale) / 2;
+    const fullGridBottom = gridY + fullGridBox.height * gridScale;
+    const heatTitleY = fullGridBottom + 22;
+    const heatY = heatTitleY + 8;
+    if (heatY + heatBox.height * heatScale <= pageH - 8) {
+      const page = `<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+        <rect width="100%" height="100%" fill="white"/>
+        <text x="${pageW / 2}" y="14" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(spectraTitle)}</text>
+        <g transform="translate(${fullGridX.toFixed(2)} ${gridY}) scale(${gridScale.toFixed(5)})">${stripSvg(fullGrid)}</g>
+        <text x="${pageW / 2}" y="${heatTitleY.toFixed(2)}" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(heatmapTitle)}</text>
+        <g transform="translate(${heatX.toFixed(2)} ${heatY.toFixed(2)}) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
+      </svg>`;
+      return { pages: [page], previewSvg: stackedPreviewSvg([page]) };
+    }
+    const rowPages = [];
+    for (let start = 0; start < activeRows.length; start += rowsPerPage) rowPages.push(activeRows.slice(start, start + rowsPerPage));
+    if (!rowPages.length) rowPages.push([]);
+    const pages = rowPages.map((rows) => {
+      const pageWells = gridArgs.wells.filter((well) => rows.includes(well[0]));
+      const pageGrid = gridSvg({ ...gridArgs, wells: pageWells, report: true, report96: true, showTitle: false });
+      const gridBox = svgSize(pageGrid);
+      const gridX = marginX + (contentWidth - gridBox.width * gridScale) / 2;
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+        <rect width="100%" height="100%" fill="white"/>
+        <text x="${pageW / 2}" y="14" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(spectraTitle)}</text>
+        <g transform="translate(${gridX.toFixed(2)} ${gridY}) scale(${gridScale.toFixed(5)})">${stripSvg(pageGrid)}</g>
+      </svg>`;
+    });
+    const heatPageY = 18;
+    const heatPageScale = Math.min(1, contentWidth / heatBox.width, (pageH - heatPageY - 8) / heatBox.height);
+    const heatPageX = marginX + (contentWidth - heatBox.width * heatPageScale) / 2;
+    pages.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+      <rect width="100%" height="100%" fill="white"/>
+      <text x="${pageW / 2}" y="14" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(heatmapTitle)}</text>
+      <g transform="translate(${heatPageX.toFixed(2)} ${heatPageY}) scale(${heatPageScale.toFixed(5)})">${stripSvg(heatmap)}</g>
+    </svg>`);
+    return { pages, previewSvg: stackedPreviewSvg(pages) };
+  }
+
   function combine384ReportPages(title, gridArgs, heatmap) {
     const pageW = 595.28;
     const pageH = 841.89;
@@ -1584,9 +1646,13 @@
     const heatSvg = heatmapSvg(heat, config, heatmapTitle, "ratio");
     const reportHeatSvg = compact384 ? heatSvg : heatmapSvg(heat, config, heatmapTitle, "ratio", { reportPlate: true, showTitle: false });
     const reportTitle = is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap";
+    const reportGridArgs = { title: spectraTitle, tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights };
+    const reportTitles = { spectraTitle, heatmapTitle, fontFamily: config.plotting?.font_family || "Arial" };
     const reportSvg = compact384
-      ? combine384ReportPages(reportTitle, { title: "GECO 384 paired spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights }, heatSvg)
-      : combine96ReportSvg(reportGrid, reportHeatSvg, { spectraTitle, heatmapTitle, fontFamily: config.plotting?.font_family || "Arial" });
+      ? combine384ReportPages(reportTitle, reportGridArgs, heatSvg)
+      : is384
+        ? combine384PlateReportPages(reportGridArgs, reportHeatSvg, reportTitles)
+        : combine96ReportSvg(reportGrid, reportHeatSvg, reportTitles);
     const files = [{ path: "tables/GECO_peak_ratio.xlsx", bytes: rowsToXlsxBytes(summary, "peak_ratio") }];
     await addFigureFiles(files, "figures/GECO_grid_plots", grid);
     await addFigureFiles(files, "figures/GECO_heatmap", heatSvg);
