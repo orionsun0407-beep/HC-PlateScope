@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-09-22-measured-wells-compact-layout";
+  const APP_VERSION = "2026-09-22-compact-heatmap-plate-labels";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -995,16 +995,9 @@
     const compactMeasured = String(config.plotting?.spectra_grid?.mode || "plate").toLowerCase() === "compact";
     const usedRows = new Set(valueWells.map((well) => well[0]));
     const usedCols = new Set(valueWells.map((well) => Number(well.slice(1))));
-    const configuredCols = Math.max(1, Math.min(24, Number(config.plotting?.spectra_grid?.columns || 12)));
-    const compactCols = Math.max(1, Math.min(configuredCols, valueWells.length || 1));
-    const compactRows = Math.max(1, Math.ceil(valueWells.length / compactCols));
-    const rows = compactMeasured
-      ? Array.from({ length: compactRows }, (_, idx) => String(idx + 1))
-      : layout.rows.filter((row) => usedRows.has(row));
-    const cols = compactMeasured
-      ? Array.from({ length: compactCols }, (_, idx) => idx + 1)
-      : layout.cols.filter((col) => usedCols.has(col));
-    const cellWell = (row, col, r, c) => compactMeasured ? valueWells[r * compactCols + c] : `${row}${String(col).padStart(2, "0")}`;
+    const rows = layout.rows.filter((row) => usedRows.has(row));
+    const cols = layout.cols.filter((col) => usedCols.has(col));
+    const cellWell = (row, col) => `${row}${String(col).padStart(2, "0")}`;
     const cm = 28.3464567;
     const baseCell = layout.format === 384 ? 24 : 34;
     const cell = is384Layout ? 1.5 * cm : baseCell;
@@ -1028,7 +1021,6 @@
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
     const heat384TextSize = 9.2;
-    const compactWellSize = is384Layout ? 7.4 : 6.6;
     const compactValueSize = is384Layout ? 8.6 : 7.2;
     const titleFontFamily = config.plotting?.font_family || "Arial";
     let body = `<rect width="100%" height="100%" fill="white"/>
@@ -1037,17 +1029,13 @@
     rows.forEach((row, r) => {
       body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout || compactMeasured ? "900" : "400", fill: "#333" }, row);
       cols.forEach((col, c) => {
-        const well = cellWell(row, col, r, c);
-        if (!well) return;
+        const well = cellWell(row, col);
         const value = Number(values[well]);
         if (!Number.isFinite(value)) return;
         const fill = lerpColor(ramp, (value - min) / Math.max(1e-9, max - min));
         body += svgEl("rect", { x: gridX + c * cell, y: top + r * cell, width: cell - 1, height: cell - 1, fill, stroke: "#fff", "stroke-width": 0.5 });
-        if (compactMeasured) {
-          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + compactWellSize + 3, "text-anchor": "middle", "font-size": compactWellSize, "font-weight": "900", fill: "#1F2A24" }, well);
-        }
         if (config.plotting.heatmap.show_values && (is384Layout || cell >= 28)) {
-          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + (compactMeasured ? cell * 0.70 : cell / 2 + 3), "text-anchor": "middle", "font-size": compactMeasured ? compactValueSize : is384Layout ? heat384TextSize : 7, "font-weight": is384Layout || compactMeasured ? "900" : "400", fill: "#1F2A24" }, fmt(value, 2));
+          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": compactMeasured ? compactValueSize : is384Layout ? heat384TextSize : 7, "font-weight": is384Layout || compactMeasured ? "900" : "400", fill: "#1F2A24" }, fmt(value, 2));
         }
       });
     });
