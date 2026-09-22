@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-09-04-384-fit-then-paginate";
+  const APP_VERSION = "2026-09-22-measured-wells-compact-layout";
   const ROWS_384 = "ABCDEFGHIJKLMNOP".split("");
   const COLS_384 = Array.from({ length: 24 }, (_, i) => i + 1);
   const STORE_KEY = "hc_platescope_native_runs";
@@ -582,6 +582,15 @@
     return best;
   }
 
+  function hasMeasuredValues(table, well) {
+    return Boolean(table?.rows?.some((row) => Number.isFinite(asNum(row[well]))));
+  }
+
+  function measuredWells(wells, tables) {
+    const requiredTables = (tables || []).filter(Boolean);
+    return wells.filter((well) => requiredTables.length && requiredTables.every((table) => hasMeasuredValues(table, well)));
+  }
+
   function normalizeMaxPerWell(table, wells, strictPositive = false, dataset = "") {
     const rows = table.rows.map((row) => ({ Wavelength: row.Wavelength }));
     const summary = [];
@@ -902,9 +911,10 @@
     const layout = config.plotting.spectra_grid || {};
     const plate = plateLayout(config, wells);
     const compactLayout = String(layout.mode || "plate").toLowerCase() === "compact";
-    const measured384PlateLayout = plate.format === 384 && !compactLayout && moduleKey === "geco";
+    const measuredPlateLayout = !compactLayout;
+    const paired384PlateLayout = measuredPlateLayout && plate.format === 384 && moduleKey === "geco";
     const is384Report = report && plate.format === 384 && compactLayout;
-    const isPlateStyleReport = report && report96 && (plate.format === 96 || measured384PlateLayout);
+    const isPlateStyleReport = report && report96 && measuredPlateLayout;
     const configuredCols = Math.max(1, Math.min(24, Number(layout.columns || 12)));
     const cm = 28.3464567;
     const report384PanelSize = 2.1 * cm;
@@ -921,17 +931,17 @@
     let ncols;
     let rows;
     let positions;
-    if (measured384PlateLayout) {
+    if (measuredPlateLayout) {
       const activeRows = plate.rows.filter((row) => pageWells.some((well) => well[0] === row));
-      const activePairCols = [...new Set(pageWells.map((well) => Math.ceil(Number(well.slice(1)) / 2)))].sort((a, b) => a - b);
-      ncols = Math.max(1, activePairCols.length);
+      const activeCols = [...new Set(pageWells.map((well) => paired384PlateLayout ? Math.ceil(Number(well.slice(1)) / 2) : Number(well.slice(1))))].sort((a, b) => a - b);
+      ncols = Math.max(1, activeCols.length);
       rows = Math.max(1, activeRows.length);
       positions = new Map(pageWells.map((well) => [well, {
         row: activeRows.indexOf(well[0]),
-        col: activePairCols.indexOf(Math.ceil(Number(well.slice(1)) / 2)),
+        col: activeCols.indexOf(paired384PlateLayout ? Math.ceil(Number(well.slice(1)) / 2) : Number(well.slice(1))),
       }]));
     } else {
-      ncols = compactLayout ? configuredCols : plate.cols.length;
+      ncols = compactLayout ? Math.max(1, Math.min(configuredCols, pageWells.length)) : plate.cols.length;
       rows = Math.max(1, Math.ceil(pageWells.length / ncols));
       positions = new Map(pageWells.map((well, idx) => [well, { row: Math.floor(idx / ncols), col: idx % ncols }]));
     }
@@ -949,7 +959,7 @@
       const rowStart = row * ncols;
       const wellsInRow = Math.min(ncols, pageWells.length - rowStart);
       const rowW = wellsInRow * panelW + Math.max(0, wellsInRow - 1) * gap;
-      const rowOffset = is384Report && compactLayout ? (width - left * 2 - rowW) / 2 : 0;
+      const rowOffset = compactLayout ? (width - left * 2 - rowW) / 2 : 0;
       return wellPanelSvg({
         tables,
         labels,
@@ -980,52 +990,70 @@
 
   function heatmapSvg(values, config, title, label, options = {}) {
     const layout = plateLayout(config, Object.keys(values));
-    const valueWells = Object.keys(values).filter((well) => Number.isFinite(Number(values[well])));
+    const valueWells = sortedWells(Object.keys(values).filter((well) => Number.isFinite(Number(values[well]))), config);
     const is384Layout = layout.format === 384;
+    const compactMeasured = String(config.plotting?.spectra_grid?.mode || "plate").toLowerCase() === "compact";
     const usedRows = new Set(valueWells.map((well) => well[0]));
     const usedCols = new Set(valueWells.map((well) => Number(well.slice(1))));
-    const rows = is384Layout ? layout.rows.filter((row) => usedRows.has(row)) : layout.rows;
-    const cols = is384Layout ? layout.cols.filter((col) => usedCols.has(col)) : layout.cols;
+    const configuredCols = Math.max(1, Math.min(24, Number(config.plotting?.spectra_grid?.columns || 12)));
+    const compactCols = Math.max(1, Math.min(configuredCols, valueWells.length || 1));
+    const compactRows = Math.max(1, Math.ceil(valueWells.length / compactCols));
+    const rows = compactMeasured
+      ? Array.from({ length: compactRows }, (_, idx) => String(idx + 1))
+      : layout.rows.filter((row) => usedRows.has(row));
+    const cols = compactMeasured
+      ? Array.from({ length: compactCols }, (_, idx) => idx + 1)
+      : layout.cols.filter((col) => usedCols.has(col));
+    const cellWell = (row, col, r, c) => compactMeasured ? valueWells[r * compactCols + c] : `${row}${String(col).padStart(2, "0")}`;
     const cm = 28.3464567;
     const baseCell = layout.format === 384 ? 24 : 34;
     const cell = is384Layout ? 1.5 * cm : baseCell;
-    const sidePad384 = 42;
-    const left = is384Layout ? sidePad384 : 48;
+    const horizontalColorbar = is384Layout || compactMeasured;
+    const sidePad = is384Layout ? 42 : compactMeasured ? 38 : 48;
+    const left = sidePad;
     const reportPlate = options.reportPlate === true || (options.report96 === true && !is384Layout);
     const showTitle = options.showTitle !== false;
     const top = reportPlate ? 24 : 58;
-    const rightPad = is384Layout ? sidePad384 : 64;
-    const colorbar = is384Layout ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
+    const rightPad = horizontalColorbar ? sidePad : 64;
+    const colorbar = horizontalColorbar ? { h: 14, gap: 18 } : { w: 14, gap: 30 };
     const gridW = cols.length * cell;
     const gridH = rows.length * cell;
-    const min384Width = 520;
-    const width = is384Layout ? Math.max(min384Width, left + gridW + rightPad) : left + gridW + colorbar.gap + colorbar.w + 64;
-    const height = is384Layout ? top + gridH + colorbar.gap + colorbar.h + 44 : top + gridH + 52;
-    const gridX = is384Layout ? (width - gridW) / 2 : left;
+    const minHorizontalWidth = is384Layout ? 520 : 260;
+    const width = horizontalColorbar ? Math.max(minHorizontalWidth, left + gridW + rightPad) : left + gridW + colorbar.gap + colorbar.w + 64;
+    const height = horizontalColorbar ? top + gridH + colorbar.gap + colorbar.h + 44 : top + gridH + 52;
+    const gridX = horizontalColorbar ? (width - gridW) / 2 : left;
     const rowLabelX = gridX - 12;
-    const finite = Object.values(values).map(Number).filter(Number.isFinite);
+    const finite = valueWells.map((well) => Number(values[well]));
     const min = finite.length ? Math.min(...finite) : 0;
     const max = finite.length ? Math.max(...finite) : 1;
     const ramp = colorRamp(config.plotting.colors.heatmap);
     const heat384TextSize = 9.2;
+    const compactWellSize = is384Layout ? 7.4 : 6.6;
+    const compactValueSize = is384Layout ? 8.6 : 7.2;
     const titleFontFamily = config.plotting?.font_family || "Arial";
     let body = `<rect width="100%" height="100%" fill="white"/>
       ${showTitle ? `<text x="${width / 2}" y="26" text-anchor="middle" font-family="${esc(titleFontFamily)}" font-size="${is384Layout ? 11 : 18}" font-weight="${is384Layout ? 900 : 700}" font-style="normal" fill="#111">${esc(title)}</text>` : ""}`;
-    cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, col); });
+    cols.forEach((col, i) => { body += svgEl("text", { x: gridX + i * cell + cell / 2, y: top - 10, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout || compactMeasured ? "900" : "400", fill: "#333" }, col); });
     rows.forEach((row, r) => {
-      body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout ? "900" : "400", fill: "#333" }, row);
+      body += svgEl("text", { x: rowLabelX, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8, "font-weight": is384Layout || compactMeasured ? "900" : "400", fill: "#333" }, row);
       cols.forEach((col, c) => {
-        const well = `${row}${String(col).padStart(2, "0")}`;
+        const well = cellWell(row, col, r, c);
+        if (!well) return;
         const value = Number(values[well]);
-        const fill = Number.isFinite(value) ? lerpColor(ramp, (value - min) / Math.max(1e-9, max - min)) : "#F2F2F2";
+        if (!Number.isFinite(value)) return;
+        const fill = lerpColor(ramp, (value - min) / Math.max(1e-9, max - min));
         body += svgEl("rect", { x: gridX + c * cell, y: top + r * cell, width: cell - 1, height: cell - 1, fill, stroke: "#fff", "stroke-width": 0.5 });
-        if (config.plotting.heatmap.show_values && Number.isFinite(value) && (is384Layout || cell >= 28)) {
-          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + cell / 2 + 3, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 7, "font-weight": is384Layout ? "900" : "400", fill: "#1F2A24" }, fmt(value, 2));
+        if (compactMeasured) {
+          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + compactWellSize + 3, "text-anchor": "middle", "font-size": compactWellSize, "font-weight": "900", fill: "#1F2A24" }, well);
+        }
+        if (config.plotting.heatmap.show_values && (is384Layout || cell >= 28)) {
+          body += svgEl("text", { x: gridX + c * cell + cell / 2, y: top + r * cell + (compactMeasured ? cell * 0.70 : cell / 2 + 3), "text-anchor": "middle", "font-size": compactMeasured ? compactValueSize : is384Layout ? heat384TextSize : 7, "font-weight": is384Layout || compactMeasured ? "900" : "400", fill: "#1F2A24" }, fmt(value, 2));
         }
       });
     });
+    if (!valueWells.length) body += svgEl("text", { x: width / 2, y: top + cell / 2, "text-anchor": "middle", "font-size": 10, "font-weight": "700", fill: "#6B756D" }, "No measured wells with finite values");
     const segments = 80;
-    if (is384Layout) {
+    if (horizontalColorbar) {
       const barW = Math.min(Math.max(gridW, 180), width - left * 2);
       const barX = (width - barW) / 2;
       const barY = top + gridH + colorbar.gap;
@@ -1041,7 +1069,7 @@
         body += svgEl("line", { x1: xTick, y1: barY + colorbar.h, x2: xTick, y2: barY + colorbar.h + 4, stroke: "#444", "stroke-width": 0.45 });
         body += svgEl("text", { x: xTick, y: barY + colorbar.h + 13, "text-anchor": "middle", "font-size": 8.2, "font-weight": "800", fill: "#333" }, fmt(value, 2));
       });
-      body += svgEl("text", { x: width / 2, y: height - 8, "text-anchor": "middle", "font-size": heat384TextSize, "font-weight": "900", fill: "#333" }, esc(label));
+      body += svgEl("text", { x: width / 2, y: height - 8, "text-anchor": "middle", "font-size": is384Layout ? heat384TextSize : 8.2, "font-weight": "900", fill: "#333" }, esc(label));
     } else {
       const barX = gridX + gridW + colorbar.gap;
       const barY = top;
@@ -1109,6 +1137,70 @@
     </svg>`;
   }
 
+  function combineCompactReportPages(gridArgs, heatmap, { spectraTitle, heatmapTitle, fontFamily = "Arial" }) {
+    const pageW = 595.28;
+    const pageH = 841.89;
+    const marginX = 28.3464567;
+    const contentWidth = pageW - marginX * 2;
+    const titleSize = 12;
+    const titleWeight = 900;
+    const gridY = 18;
+    const layout = gridArgs.config?.plotting?.spectra_grid || {};
+    const requestedCols = Math.max(1, Math.min(24, Number(layout.columns || 12), gridArgs.wells.length || 1));
+    const requestedRows = Math.max(1, Math.min(16, Number(layout.rows_per_page || 8)));
+    const plate = plateLayout(gridArgs.config, gridArgs.wells);
+    const is384 = plate.format === 384;
+    const panelW = is384 ? 2.1 * 28.3464567 : 48;
+    const panelH = is384 ? 2.1 * 28.3464567 : 57;
+    const gap = is384 ? 4 : 1.5;
+    const side = 4;
+    const top = 18;
+    const footer = 10;
+    const estimatedWidth = side * 2 + requestedCols * panelW + Math.max(0, requestedCols - 1) * gap;
+    const estimatedScale = Math.min(1, contentWidth / estimatedWidth);
+    const maxRowsByHeight = Math.max(1, Math.floor(((pageH - gridY - 8) / estimatedScale - top - footer + gap) / (panelH + gap)));
+    const rowsPerPage = Math.min(requestedRows, maxRowsByHeight);
+    const wellsPerPage = requestedCols * rowsPerPage;
+    const wellPages = [];
+    for (let start = 0; start < gridArgs.wells.length; start += wellsPerPage) wellPages.push(gridArgs.wells.slice(start, start + wellsPerPage));
+    if (!wellPages.length) wellPages.push([]);
+    const heatBox = svgSize(heatmap);
+    const heatScale = Math.min(1, contentWidth / heatBox.width);
+    const heatX = marginX + (contentWidth - heatBox.width * heatScale) / 2;
+    const pages = [];
+    let heatPlaced = false;
+    wellPages.forEach((pageWells, pageIndex) => {
+      const pageGrid = gridSvg({ ...gridArgs, wells: pageWells, report: true, report96: false, showTitle: false });
+      const gridBox = svgSize(pageGrid);
+      const gridScale = Math.min(1, contentWidth / gridBox.width, (pageH - gridY - 8) / gridBox.height);
+      const gridX = marginX + (contentWidth - gridBox.width * gridScale) / 2;
+      const gridBottom = gridY + gridBox.height * gridScale;
+      const heatTitleY = gridBottom + 22;
+      const heatY = heatTitleY + 8;
+      const isLastSpectraPage = pageIndex === wellPages.length - 1;
+      const canPlaceHeat = isLastSpectraPage && heatY + heatBox.height * heatScale <= pageH - 8;
+      pages.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+        <rect width="100%" height="100%" fill="white"/>
+        <text x="${pageW / 2}" y="14" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(spectraTitle)}</text>
+        <g transform="translate(${gridX.toFixed(2)} ${gridY}) scale(${gridScale.toFixed(5)})">${stripSvg(pageGrid)}</g>
+        ${canPlaceHeat ? `<text x="${pageW / 2}" y="${heatTitleY.toFixed(2)}" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(heatmapTitle)}</text>
+        <g transform="translate(${heatX.toFixed(2)} ${heatY.toFixed(2)}) scale(${heatScale.toFixed(5)})">${stripSvg(heatmap)}</g>` : ""}
+      </svg>`);
+      if (canPlaceHeat) heatPlaced = true;
+    });
+    if (!heatPlaced) {
+      const heatY = 18;
+      const pageHeatScale = Math.min(1, contentWidth / heatBox.width, (pageH - heatY - 8) / heatBox.height);
+      const pageHeatX = marginX + (contentWidth - heatBox.width * pageHeatScale) / 2;
+      pages.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+        <rect width="100%" height="100%" fill="white"/>
+        <text x="${pageW / 2}" y="14" text-anchor="middle" font-family="${esc(fontFamily)}" font-size="${titleSize}" font-weight="${titleWeight}" font-style="normal" fill="#111">${esc(heatmapTitle)}</text>
+        <g transform="translate(${pageHeatX.toFixed(2)} ${heatY}) scale(${pageHeatScale.toFixed(5)})">${stripSvg(heatmap)}</g>
+      </svg>`);
+    }
+    return { pages, previewSvg: stackedPreviewSvg(pages) };
+  }
+
   function combine384PlateReportPages(gridArgs, heatmap, { spectraTitle, heatmapTitle, fontFamily = "Arial" }) {
     const pageW = 595.28;
     const pageH = 841.89;
@@ -1122,13 +1214,13 @@
     const panelH = 61;
     const gap = 0.6;
     const full96GridWidth = 1.2 * 2 + 12 * panelW + 11 * gap;
-    const gridScale = Math.min(1, contentWidth / full96GridWidth);
-    const gridFixedHeight = 8 + 10 - gap;
-    const rowsPerPage = Math.max(1, Math.floor(((pageH - gridY - 8) / gridScale - gridFixedHeight) / (panelH + gap)));
     const plate = plateLayout(gridArgs.config, gridArgs.wells);
     const activeRows = plate.rows.filter((row) => gridArgs.wells.some((well) => well[0] === row));
     const fullGrid = gridSvg({ ...gridArgs, report: true, report96: true, showTitle: false });
     const fullGridBox = svgSize(fullGrid);
+    const gridScale = Math.min(1, contentWidth / full96GridWidth, contentWidth / fullGridBox.width);
+    const gridFixedHeight = 8 + 10 - gap;
+    const rowsPerPage = Math.max(1, Math.floor(((pageH - gridY - 8) / gridScale - gridFixedHeight) / (panelH + gap)));
     const fullGridX = marginX + (contentWidth - fullGridBox.width * gridScale) / 2;
     const heatBox = svgSize(heatmap);
     const heatScale = Math.min(1, contentWidth / heatBox.width);
@@ -1634,22 +1726,37 @@
       summary = gecoPeakRatio(withCa, withoutCa, wells);
       inputFiles = [withFile.name, withoutFile.name];
     }
+    const availableWells = measuredWells(wells, [withCa, withoutCa]);
+    const omittedWells = wells.filter((well) => !availableWells.includes(well));
+    if (omittedWells.length) warnings.push(`Skipped wells with no measured numeric spectra in both GECO inputs: ${omittedWells.join(", ")}.`);
+    if (!availableWells.length) throw new Error("No wells with measured numeric spectra were found in both GECO inputs.");
+    wells = availableWells;
+    withCa = subsetTable(withCa, wells);
+    withoutCa = subsetTable(withoutCa, wells);
+    summary = gecoPeakRatio(withCa, withoutCa, wells);
+    if (is384) {
+      const pairByWithoutWell = new Map(geco384Pairs(wells.flatMap((well) => [well, `${well[0]}${String(Number(well.slice(1)) + 1).padStart(2, "0")}`])).pairs);
+      summary = summary.map((row) => {
+        const partner = pairByWithoutWell.get(row.well_id) || `${row.well_id[0]}${String(Number(row.well_id.slice(1)) + 1).padStart(2, "0")}`;
+        return { ...row, without_ca_well: row.well_id, with_ca_well: partner, pair_id: `${row.well_id}/${partner}` };
+      });
+    }
     warnings.push(...warningIfNegative(withCa, wells), ...warningIfNegative(withoutCa, wells));
     const heat = heatmapValues(summary, is384 ? "ratio" : "ratio");
     const highlights = Object.fromEntries(summary.map((row) => [row.well_id, [{ text: fmt(row.ratio, 2), color: config.plotting.badges.geco_ratio }]]));
     const grid = gridSvg({ title: is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well", tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights });
     const spectraTitle = is384 ? "GECO 384 paired spectra by well" : "GECO spectra by well";
     const heatmapTitle = is384 ? "GECO 384 paired max(with CA) / max(without CA)" : "GECO max(with CA) / max(without CA)";
-    const compact384 = is384 && String(config.plotting?.spectra_grid?.mode || "plate").toLowerCase() === "compact";
-    const plateStyleReport = !compact384;
-    const reportGrid = gridSvg({ title: spectraTitle, tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true, report96: plateStyleReport, showTitle: compact384 });
+    const compactLayout = String(config.plotting?.spectra_grid?.mode || "plate").toLowerCase() === "compact";
+    const plateStyleReport = !compactLayout;
+    const reportGrid = gridSvg({ title: spectraTitle, tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights, report: true, report96: plateStyleReport, showTitle: false });
     const heatSvg = heatmapSvg(heat, config, heatmapTitle, "ratio");
-    const reportHeatSvg = compact384 ? heatSvg : heatmapSvg(heat, config, heatmapTitle, "ratio", { reportPlate: true, showTitle: false });
+    const reportHeatSvg = heatmapSvg(heat, config, heatmapTitle, "ratio", { reportPlate: true, showTitle: false });
     const reportTitle = is384 ? "GECO 384 paired spectra and peak ratio heatmap" : "GECO spectra and peak ratio heatmap";
     const reportGridArgs = { title: spectraTitle, tables: [withCa, withoutCa], labels: ["with CA", "without CA"], wells, config, moduleKey: "geco", highlights };
     const reportTitles = { spectraTitle, heatmapTitle, fontFamily: config.plotting?.font_family || "Arial" };
-    const reportSvg = compact384
-      ? combine384ReportPages(reportTitle, reportGridArgs, heatSvg)
+    const reportSvg = compactLayout
+      ? combineCompactReportPages(reportGridArgs, reportHeatSvg, reportTitles)
       : is384
         ? combine384PlateReportPages(reportGridArgs, reportHeatSvg, reportTitles)
         : combine96ReportSvg(reportGrid, reportHeatSvg, reportTitles);
@@ -1666,17 +1773,32 @@
     const file = fileInput("luci_upload");
     if (!file) throw new Error("Upload one LUCI table before running.");
     const prepared = await prepareFile(file, config, getChecked("luci_auto"));
-    const wells = prepared.wells;
-    const warnings = warningIfNegative(prepared.table, wells);
-    const norm = normalizeMaxPerWell(prepared.table, wells).table;
+    const wells = measuredWells(prepared.wells, [prepared.table]);
+    const omittedWells = prepared.wells.filter((well) => !wells.includes(well));
+    if (!wells.length) throw new Error("No wells with measured numeric LUCI spectra were found.");
+    const measuredTable = subsetTable(prepared.table, wells);
+    const warnings = warningIfNegative(measuredTable, wells);
+    if (omittedWells.length) warnings.push(`Skipped LUCI wells with no measured numeric spectra: ${omittedWells.join(", ")}.`);
+    const norm = normalizeMaxPerWell(measuredTable, wells).table;
     const peaks = config.peaks;
     const summary = luciPeakSummary(norm, wells, peaks.luci_450_window, peaks.luci_520_window);
     const heat = heatmapValues(summary, "ratio_520_450");
     const highlights = Object.fromEntries(summary.map((row) => [row.well_id, [{ text: fmt(row.ratio_520_450, 2), color: config.plotting.badges.luci_ratio }]]));
     const grid = gridSvg({ title: "LUCI normalized spectra", tables: [norm], labels: ["LUCI"], wells, config, normalized: true, moduleKey: "luci", highlights });
-    const reportGrid = gridSvg({ title: "LUCI normalized spectra", tables: [norm], labels: ["LUCI"], wells, config, normalized: true, moduleKey: "luci", highlights, report: true });
-    const heatSvg = heatmapSvg(heat, config, "LUCI 520/450 ratio", "ratio_520_450");
-    const reportSvg = combineReportSvg("LUCI spectra and 520/450 ratio heatmap", reportGrid, heatSvg);
+    const spectraTitle = "LUCI normalized spectra";
+    const heatmapTitle = "LUCI 520/450 ratio";
+    const plateFormat = plateLayout(config, wells).format;
+    const compactLayout = String(config.plotting?.spectra_grid?.mode || "plate").toLowerCase() === "compact";
+    const reportGrid = gridSvg({ title: spectraTitle, tables: [norm], labels: ["LUCI"], wells, config, normalized: true, moduleKey: "luci", highlights, report: true, report96: !compactLayout, showTitle: false });
+    const heatSvg = heatmapSvg(heat, config, heatmapTitle, "ratio_520_450");
+    const reportHeatSvg = heatmapSvg(heat, config, heatmapTitle, "ratio_520_450", { reportPlate: true, showTitle: false });
+    const reportGridArgs = { title: spectraTitle, tables: [norm], labels: ["LUCI"], wells, config, normalized: true, moduleKey: "luci", highlights };
+    const reportTitles = { spectraTitle, heatmapTitle, fontFamily: config.plotting?.font_family || "Arial" };
+    const reportSvg = compactLayout
+      ? combineCompactReportPages(reportGridArgs, reportHeatSvg, reportTitles)
+      : plateFormat === 384
+        ? combine384PlateReportPages(reportGridArgs, reportHeatSvg, reportTitles)
+        : combine96ReportSvg(reportGrid, reportHeatSvg, reportTitles);
     const files = [
       { path: "tables/LUCI_normalized.xlsx", bytes: tableToXlsxBytes(norm, "normalized") },
       { path: "tables/LUCI_peak_summary.xlsx", bytes: rowsToXlsxBytes(summary, "peak_summary") },
@@ -1685,7 +1807,7 @@
     await addFigureFiles(files, "figures/LUCI_ratio_heatmap", heatSvg);
     await addFigureFiles(files, "report/LUCI_combined_report", reportSvg);
     const id = runId("LUCI");
-    return makeResult({ id, module: "luci", config, summary, wells, data: { normalized: norm }, files, metadataExtra: { module_type: "LUCI", input_files: [file.name], plate_format: plateLayout(config, wells).format, common_well_count: wells.length }, warnings, log: [`Created run ${id}`, `Processed ${wells.length} wells.`] });
+    return makeResult({ id, module: "luci", config, summary, wells, data: { normalized: norm }, files, metadataExtra: { module_type: "LUCI", input_files: [file.name], plate_format: plateFormat, common_well_count: wells.length }, warnings, log: [`Created run ${id}`, `Processed ${wells.length} measured wells.`] });
   }
 
   async function runLss() {
